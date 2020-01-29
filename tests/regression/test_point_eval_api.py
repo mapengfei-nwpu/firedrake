@@ -141,3 +141,7 @@ def test_nascent_parallel_support():
     assert np.allclose(0.0576, f.at([0.12, 0.18]))
     assert np.allclose(1.0266, f.at([0.98, 0.87]))
     assert np.allclose([0.2176, 0.2822], f.at([0.12, 0.68], [0.63, 0.34]))
+
+if __name__ == "__main__":
+    import pytest, sys
+    pytest.main([sys.argv[0]])
