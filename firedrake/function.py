@@ -643,7 +643,7 @@ def make_c_evaluate(function, c_name="evaluate", ldargs=None, tolerance=None):
 
     mesh = function.ufl_domain()
     src = [pq_utils.src_locate_cell(mesh, tolerance=tolerance)]
-    src.append(compile_element(function, mesh.coordinates)) # Use mesh that function is defined on as coordinate field
+    src.append(compile_element(function, mesh.coordinates))
 
     args = []
 
