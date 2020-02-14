@@ -366,12 +366,11 @@ def test_bendy_cube_unit(degree):
 @pytest.mark.parallel(nprocs=2)
 def test_bendy_cube_parallel(degree):
     return run_bendy_cube(degree)
-
+        
 
 @pytest.mark.parallel(nprocs=2)
 def test_bendy_cube_unit_parallel(degree):
     return run_bendy_cube_unit(degree)
-
 
 def test_mesh_reordering_defaults_on():
     assert parameters["reorder_meshes"]
@@ -421,3 +420,17 @@ def test_changing_default_reorder_works(reorder):
         assert m._did_reordering == reorder
     finally:
         parameters["reorder_meshes"] = old_reorder
+
+def test_point_1d():
+    dim = 0
+    cells = [[0]]
+    coords = [[1, 2]]
+    comm = COMM_WORLD
+    plex = mesh._from_cell_list(dim, cells, coords, comm)
+    m = Mesh(plex)
+    return 0
+
+if __name__ == "__main__":
+    test_point_1d()
+    import pytest, sys
+    pytest.main([sys.argv[0]])
