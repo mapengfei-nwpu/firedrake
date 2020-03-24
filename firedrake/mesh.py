@@ -1009,6 +1009,18 @@ class ExtrudedMeshTopology(MeshTopology):
             cell_list += list(range(col, col + (self.layers - 1)))
         return cell_data[cell_list]
 
+class VertexOnlyMeshTopology(MeshTopology):
+    """Representation of a vertex-only mesh topology."""
+
+    def __init__(self, plex, swarm):
+        """
+        # to redo
+        """
+
+        mesh.init()
+        # todo...
+
+
 
 class MeshGeometry(ufl.Mesh, MeshGeometryMixin):
     """A representation of mesh topology and geometry."""
@@ -1546,6 +1558,8 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
         COMM_WORLD).
     """
 
+    import firedrake.functionspace as functionspace
+
     mesh.init()
     vertexcoords = np.asarray(vertexcoords, dtype=np.double)
     tdim = mesh.topological_dimension()
@@ -1555,6 +1569,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
 
     swarm = createDMSwarm(mesh.topology._plex, vertexcoords)
 
+    # topology = VertexOnlyMeshTopology(mesh.topology, swarm)
 
     def createDMSwarm(dmplex, coords, comm=COMM_WORLD):
         """
