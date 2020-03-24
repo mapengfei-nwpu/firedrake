@@ -1569,7 +1569,22 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
 
     swarm = createDMSwarm(mesh.topology._plex, vertexcoords)
 
+    # Topology
+    # Not quite sure how to do topology yet!
+    # Should VertexOnlyMeshTopology inherit from MeshTopology which
+    # expects a DMPlex?
     # topology = VertexOnlyMeshTopology(mesh.topology, swarm)
+
+    # Geometry
+    # Can I set from coordinates (which is a firedrake Function)? If so,
+    # what mesh should it be defined on?
+    # How would I deal with the points moving if the geometry is set by
+    # a function?
+    element = ufl.FiniteElement("DG", ufl.interval, 0)
+    newmesh = MeshGeometry.__new__(MeshGeometry, element)
+
+
+    self._base_mesh = mesh
 
     def createDMSwarm(dmplex, coords, comm=COMM_WORLD):
         """
