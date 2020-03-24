@@ -1534,7 +1534,7 @@ def ExtrudedMesh(mesh, layers, layer_height=None, extrusion_type='uniform', kern
 
     return self
 
-def VertexMesh(mesh, vertexcoords, comm=COMM_WORLD):
+def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     """
     Create a vertex only mesh, immersed in a given mesh, with vertices
     defined by a list of coordinates.
@@ -1546,13 +1546,14 @@ def VertexMesh(mesh, vertexcoords, comm=COMM_WORLD):
         COMM_WORLD).
     """
 
+    mesh.init()
     vertexcoords = np.asarray(vertexcoords, dtype=np.double)
     tdim = mesh.topological_dimension()
-    gdim = mesh.geometric_dimension()
     pdim = np.shape(vertexcoords)[1]
     if pdim != tdim:
         raise ValueError(f"Mesh topological dimension {tdim} must match point list dimension {pdim}")
-    swarm = createDMSwarm(mesh._plex, vertexcoords)
+
+    swarm = createDMSwarm(mesh.topology._plex, vertexcoords)
 
 
     def createDMSwarm(dmplex, coords, comm=COMM_WORLD):
