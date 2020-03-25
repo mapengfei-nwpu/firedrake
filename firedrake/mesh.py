@@ -1603,6 +1603,8 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     :return: the immersed DMSwarm
     """
 
+    coords = np.asarray(coords, dtype=np.double)
+
     # Create a DMSWARM
     swarm = PETSc.DMSwarm().create(comm=comm)
 
@@ -1610,7 +1612,7 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     swarm.setDimension(dmplex.getDimension())
 
     # Set coordinates dimension
-    swarm.setCoordinateDim(pdim)
+    swarm.setCoordinateDim(np.shape(coords)[1])
 
     # Link to DMPlex cells information for when swarm.migrate() is used
     swarm.setCellDM(dmplex)
