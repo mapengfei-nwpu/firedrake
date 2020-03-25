@@ -1567,7 +1567,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     if pdim != tdim:
         raise ValueError(f"Mesh topological dimension {tdim} must match point list dimension {pdim}")
 
-    swarm = createDMSwarm(mesh.topology._plex, vertexcoords)
+    swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
 
     # Topology
     # Not quite sure how to do topology yet!
@@ -1586,7 +1586,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
 
     self._base_mesh = mesh
 
-def createDMSwarm(dmplex, coords, comm=COMM_WORLD):
+def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     """
     Create a Particle In Cell (PIC) DMSwarm, immersed in a DMPlex
     at given point coordinates.
