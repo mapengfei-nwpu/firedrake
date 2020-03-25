@@ -2058,29 +2058,15 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     tcell = topology.ufl_cell()
     cell = tcell.reconstruct(geometric_dimension=gdim)
     element = ufl.VectorElement("Lagrange", cell, 1)
-    # Create mesh object
-    vmesh = MeshGeometry.__new__(MeshGeometry, element)
-    vmesh._topology = topology
+    coordinates_fs = functionspace.VectorFunctionSpace(topology, element, dim=gdim)
+    coordinates = function.CoordinatelessFunction(coordinates_fs, name="Coordinates")
 
-    def callback(self):
-        """Finish initialisation."""
-        del self._callback
-        # Finish the initialisation of mesh topology
-        self.topology.init()
 
-        coordinates_fs = functionspace.VectorFunctionSpace(self.topology, "Lagrange", 1,
-                                                           dim=gdim)
 
-        coordinates_data = dmplex.reordered_coords(plex, coordinates_fs.dm.getDefaultSection(),
-                                                   (self.num_vertices(), gdim))
+    # # Create mesh object
+    # vmesh = MeshGeometry.__new__(MeshGeometry, element)
+    # vmesh._topology = topology
 
-        coordinates = function.CoordinatelessFunction(coordinates_fs,
-                                                      val=coordinates_data,
-                                                      name="Coordinates")
-
-        self.__init__(coordinates)
-
-    vmesh._callback = callback
     return vmesh
 
 
