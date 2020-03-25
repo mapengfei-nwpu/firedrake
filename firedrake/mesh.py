@@ -2043,6 +2043,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
 
     mesh.init()
     vertexcoords = np.asarray(vertexcoords, dtype=np.double)
+    gdim = mesh.geometric_dimension()
     tdim = mesh.topological_dimension()
     pdim = np.shape(vertexcoords)[1]
     if pdim != tdim:
@@ -2051,12 +2052,39 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
 
     # Topology
-    # Not quite sure how to do topology yet!
-    # Should VertexOnlyMeshTopology inherit from MeshTopology which
-    # expects a DMPlex?
-    # topology = VertexOnlyMeshTopology(mesh.topology, swarm)
+    topology = VertexOnlyMeshTopology(swarm, mesh.topology, name="swarmmesh", reorder=False, distribution_parameters={})
 
     # Geometry
+    tcell = topology.ufl_cell()
+    cell = tcell.reconstruct(geometric_dimension=gdim)
+    element = ufl.VectorElement("Lagrange", cell, 1)
+    # Create mesh object
+    mesh = MeshGeometry.__new__(MeshGeometry, element)
+    mesh._topology = topology
+
+    def callback(self):
+        """Finish initialisation."""
+        del self._callback
+        # Finish the initialisation of mesh topology
+        self.topology.init()
+
+        coordinates_fs = functionspace.VectorFunctionSpace(self.topology, "Lagrange", 1,
+                                                           dim=gdim)
+
+        coordinates_data = dmplex.reordered_coords(plex, coordinates_fs.dm.getDefaultSection(),
+                                                   (self.num_vertices(), gdim))
+
+        coordinates = function.CoordinatelessFunction(coordinates_fs,
+                                                      val=coordinates_data,
+                                                      name="Coordinates")
+
+        self.__init__(coordinates)
+
+    mesh._callback = callback
+    return mesh
+
+
+
     # Can I set from coordinates (which is a firedrake Function)? If so,
     # what mesh should it be defined on?
     # How would I deal with the points moving if the geometry is set by
