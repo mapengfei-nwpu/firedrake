@@ -35,6 +35,7 @@ __all__ = ['Mesh', 'ExtrudedMesh', 'VertexOnlyMesh', 'SubDomainData', 'unmarked'
 
 
 _cells = {
+    0: {1: "vertex"},
     1: {2: "interval"},
     2: {3: "triangle", 4: "quadrilateral"},
     3: {4: "tetrahedron"}
@@ -1015,153 +1016,206 @@ class VertexOnlyMeshTopology(MeshTopology):
     another mesh.
     """
 
-    def __init__(self, mesh, swarm):
+    def __init__(self, swarm, parentmesh, name, reorder, distribution_parameters):
         """
-        # to redo
+        Half-initialise a mesh topology.
+
+        :arg swarm: Particle In Cell (PIC) :class:`DMSwarm` representing
+            vertices immersed within a :class:`DMPlex` stored in the
+            `parentmesh`
+        :arg parentmesh: the mesh within which the vertex-only mesh
+            topology is immersed.
+        :arg name: name of the mesh
+        :arg reorder: whether to reorder the mesh (bool)
+        :arg distribution_parameters: options controlling mesh
+            distribution, see :func:`Mesh` for details.
         """
+        # Do some validation of the input DMSwarm
 
-        mesh.init()
+        distribute = distribution_parameters.get("partition")
+        self._distribution_parameters = distribution_parameters.copy()
+        if distribute is None:
+            distribute = True
 
-        self._base_mesh = mesh
-        self.comm = swarm.comm
-        # self._plex = mesh._plex # Not needed
-        # self._entity_classes = dmplex.get_entity_classes(self._plex).astype(int) # TODO for DMSwarm?
-        # self._plex_renumbering = dmplex.plex_renumbering(self._plex,
-        #                                                  self._entity_classes,
-        #                                                  reordering) # TODO for DMSwarm?
+        ## BEGIN POTENTIALLY NOT RELEVANT ##
 
-        # self._cell_numbering = super().create_section(entity_dofs) # TODO
+        # overlap_type, overlap = distribution_parameters.get("overlap_type",
+        #                                                     (DistributedMeshOverlapType.FACET, 1))
+
+        # if overlap < 0:
+        #     raise ValueError("Overlap depth must be >= 0")
+        # if overlap_type == DistributedMeshOverlapType.NONE:
+        #     def add_overlap():
+        #         pass
+        #     if overlap > 0:
+        #         raise ValueError("Can't have NONE overlap with overlap > 0")
+        # elif overlap_type == DistributedMeshOverlapType.FACET:
+        #     def add_overlap():
+        #         dmplex.set_adjacency_callback(self._plex)
+        #         self._plex.distributeOverlap(overlap)
+        #         dmplex.clear_adjacency_callback(self._plex)
+        #         self._grown_halos = True
+        # elif overlap_type == DistributedMeshOverlapType.VERTEX:
+        #     def add_overlap():
+        #         # Default is FEM (vertex star) adjacency.
+        #         self._plex.distributeOverlap(overlap)
+        #         self._grown_halos = True
+        # else:
+        #     raise ValueError("Unknown overlap type %r" % overlap_type)
+
+        ## END POTENTIALLY NOT RELEVANT ##
+
+
+        ## BEGIN TODO
+
+        # dmplex.validate_mesh(plex) # create equivalent for DMSwarm
+
+        ## END TODO
+
+
+        ## BEGIN POTENTIALLY NOT RELEVANT ##
+
+        # plex.setFromOptions() # not needed
+
+        ## END POTENTIALLY NOT RELEVANT ##
+
+
+        utils._init()
+
+        self._parent_mesh = parentmesh
+        self.name = name
+        self.comm = dup_comm(swarm.comm.tompi4py())
+
+        # A cache of shared function space data on this mesh
+        self._shared_data_cache = defaultdict(dict)
+
+        # Cell subsets for integration over subregions
         self._subsets = {}
-        self._ufl_cell = ufl.TensorProductCell(mesh.ufl_cell(), ufl.interval)
-        if layers.shape:
-            self.variable_layers = True
-            extents = extnum.layer_extents(self._plex,
-                                           self._cell_numbering,
-                                           layers)
-            if np.any(extents[:, 3] - extents[:, 2] <= 0):
-                raise NotImplementedError("Vertically disconnected cells unsupported")
-            self.layer_extents = extents
-            """The layer extents for all mesh points.
 
-            For variable layers, the layer extent does not match those for cells.
-            A numpy array of layer extents (in PyOP2 format
-            :math:`[start, stop)`), of shape ``(num_mesh_points, 4)`` where
-            the first two extents are used for allocation and the last
-            two for iteration.
-            """
-        else:
-            self.variable_layers = False
-        self.cell_set = op2.ExtrudedSet(mesh.cell_set, layers=layers)
+        ## BEGIN POTENTIALLY NOT RELEVANT ##
 
-    @property
-    def name(self):
-        return self._base_mesh.name
+        # # Mark exterior and interior facets
+        # label_boundary = (self.comm.size == 1) or distribute
+        # dmplex.label_facets(plex, label_boundary=label_boundary)
 
-    @property
-    def cell_closure(self):
-        """2D array of ordered cell closures
+        ## END POTENTIALLY NOT RELEVANT ##
 
-        Each row contains ordered cell entities for a cell, one row per cell.
-        """
-        return self._base_mesh.cell_closure
+        # Distribute the dm to all ranks
+        if self.comm.size > 1 and distribute:
 
-    def _facets(self, kind):
-        if kind not in ["interior", "exterior"]:
-            raise ValueError("Unknown facet type '%s'" % kind)
-        base = getattr(self._base_mesh, "%s_facets" % kind)
-        return _Facets(self, base.classes,
-                       kind,
-                       base.facet_cell,
-                       base.local_facet_dat.data_ro_with_halos,
-                       markers=base.markers,
-                       unique_markers=base.unique_markers)
+            ## BEGIN TODO
 
-    def make_cell_node_list(self, global_numbering, entity_dofs, offsets):
-        """Builds the DoF mapping.
+            # not clear if this needed when running on multiple MPI ranks?
+            # neet to use intelligently in conjunction with
+            # swarm.setPointCoordinates `redundency` kwarg.
+            swarm.migrate()
 
-        :arg global_numbering: Section describing the global DoF numbering
-        :arg entity_dofs: FInAT element entity DoFs
-        :arg offsets: layer offsets for each entity dof.
-        """
-        entity_dofs = eutils.flat_entity_dofs(entity_dofs)
-        return super().make_cell_node_list(global_numbering, entity_dofs, offsets)
+            ## END TODO
 
-    def make_dofs_per_plex_entity(self, entity_dofs):
-        """Returns the number of DoFs per plex entity for each stratum,
-        i.e. [#dofs / plex vertices, #dofs / plex edges, ...].
 
-        each entry is a 2-tuple giving the number of dofs on, and
-        above the given plex entity.
+            ## BEGIN POTENTIALLY NOT RELEVANT ##
 
-        :arg entity_dofs: FInAT element entity DoFs
+            # # We distribute with overlap zero, in case we're going to
+            # # refine this mesh in parallel.  Later, when we actually use
+            # # it, we grow the halo.
+            # partitioner = plex.getPartitioner()
+            # if IntType.itemsize == 8:
+            #     # Default to PTSCOTCH on 64bit ints (Chaco is 32 bit int only)
+            #     from firedrake_configuration import get_config
+            #     if get_config().get("options", {}).get("with_parmetis", False):
+            #         partitioner.setType(partitioner.Type.PARMETIS)
+            #     else:
+            #         partitioner.setType(partitioner.Type.PTSCOTCH)
+            # else:
+            #     partitioner.setType(partitioner.Type.CHACO)
+            # try:
+            #     sizes, points = distribute
+            #     partitioner.setType(partitioner.Type.SHELL)
+            #     partitioner.setShellPartition(self.comm.size, sizes, points)
+            # except TypeError:
+            #     pass
+            # partitioner.setFromOptions()
+            # plex.distribute(overlap=0)
 
-        """
-        dofs_per_entity = np.zeros((1 + self._base_mesh.cell_dimension(), 2), dtype=IntType)
-        for (b, v), entities in entity_dofs.items():
-            dofs_per_entity[b, v] += len(entities[0])
-        return tuplify(dofs_per_entity)
+            ## END POTENTIALLY NOT RELEVANT ##
 
-    def node_classes(self, nodes_per_entity, real_tensorproduct=False):
-        """Compute node classes given nodes per entity.
+        # dim = swarm.getDimension()
+        dim = 0
+        nfacets = 1
 
-        :arg nodes_per_entity: number of function space nodes per topological entity.
-        :returns: the number of nodes in each of core, owned, and ghost classes.
-        """
-        if real_tensorproduct:
-            nodes = np.asarray(nodes_per_entity)
-            nodes_per_entity = sum(nodes[:, i] for i in range(2))
-            return super(ExtrudedMeshTopology, self).node_classes(nodes_per_entity)
-        elif self.variable_layers:
-            return extnum.node_classes(self, nodes_per_entity)
-        else:
-            nodes = np.asarray(nodes_per_entity)
-            nodes_per_entity = sum(nodes[:, i]*(self.layers - i) for i in range(2))
-            return super(ExtrudedMeshTopology, self).node_classes(nodes_per_entity)
+        ## BEGIN POTENTIALLY NOT RELEVANT ##
 
-    def make_offset(self, entity_dofs, ndofs, real_tensorproduct=False):
-        """Returns the offset between the neighbouring cells of a
-        column for each DoF.
+        # # Allow empty local meshes on a process
+        # cStart, cEnd = plex.getHeightStratum(0)  # cells
+        # if cStart == cEnd:
+        #     nfacets = -1
+        # else:
+        #     nfacets = plex.getConeSize(cStart)
 
-        :arg entity_dofs: FInAT element entity DoFs
-        :arg ndofs: number of DoFs in the FInAT element
-        """
-        entity_offset = [0] * (1 + self._base_mesh.cell_dimension())
-        for (b, v), entities in entity_dofs.items():
-            entity_offset[b] += len(entities[0])
+        # # TODO: this needs to be updated for mixed-cell meshes.
+        # nfacets = self.comm.allreduce(nfacets, op=MPI.MAX)
 
-        dof_offset = np.zeros(ndofs, dtype=IntType)
-        if not real_tensorproduct:
-            for (b, v), entities in entity_dofs.items():
-                for dof_indices in entities.values():
-                    for i in dof_indices:
-                        dof_offset[i] = entity_offset[b]
-        return dof_offset
 
-    @utils.cached_property
-    def layers(self):
-        """Return the number of layers of the extruded mesh
-        represented by the number of occurences of the base mesh."""
-        if self.variable_layers:
-            raise ValueError("Can't ask for mesh layers with variable layers")
-        else:
-            return self.cell_set.layers
+        # self._grown_halos = False
 
-    def entity_layers(self, height, label=None):
-        """Return the number of layers on each entity of a given plex
-        height.
+        ## END POTENTIALLY NOT RELEVANT ##
 
-        :arg height: The height of the entity to compute the number of
-           layers (0 -> cells, 1 -> facets, etc...)
-        :arg label: An optional label name used to select points of
-           the given height (if None, then all points are used).
-        :returns: a numpy array of the number of layers on the asked
-           for entities (or a single layer number for the constant
-           layer case).
-        """
-        if self.variable_layers:
-            return extnum.entity_layers(self, height, label)
-        else:
-            return self.cell_set.layers
+
+        self._ufl_cell = ufl.Cell(_cells[dim][nfacets])
+
+        # A set of weakrefs to meshes that are explicitly labelled as being
+        # parallel-compatible for interpolation/projection/supermeshing
+        # To set, do e.g.
+        # target_mesh._parallel_compatible = {weakref.ref(source_mesh)}
+        self._parallel_compatible = None
+
+        def callback(self):
+            """Finish initialisation."""
+            del self._callback
+
+            ## BEGIN POTENTIALLY NOT RELEVANT ##
+            # if self.comm.size > 1:
+            #     add_overlap()
+
+            # if reorder:
+            #     with timed_region("Mesh: reorder"):
+            #         old_to_new = self._plex.getOrdering(PETSc.Mat.OrderingType.RCM).indices
+            #         reordering = np.empty_like(old_to_new)
+            #         reordering[old_to_new] = np.arange(old_to_new.size, dtype=old_to_new.dtype)
+            # else:
+            #     # No reordering
+            #     reordering = None
+            ## END POTENTIALLY NOT RELEVANT ##
+            self._did_reordering = bool(reorder)
+
+
+            ## BEGIN TODO
+
+            # # Mark OP2 entities and derive the resulting Plex renumbering
+            # with timed_region("Mesh: numbering"):
+            #     dmplex.mark_entity_classes(self._plex)
+            #     self._entity_classes = dmplex.get_entity_classes(self._plex).astype(int)
+            #     self._plex_renumbering = dmplex.plex_renumbering(self._plex,
+            #                                                      self._entity_classes,
+            #                                                      reordering)
+
+            #     # Derive a cell numbering from the Plex renumbering
+            #     entity_dofs = np.zeros(dim+1, dtype=IntType)
+            #     entity_dofs[-1] = 1
+
+            #     self._cell_numbering = self.create_section(entity_dofs)
+            #     entity_dofs[:] = 0
+            #     entity_dofs[0] = 1
+            #     self._vertex_numbering = self.create_section(entity_dofs)
+
+            #     entity_dofs[:] = 0
+            #     entity_dofs[-2] = 1
+            #     facet_numbering = self.create_section(entity_dofs)
+            #     self._facet_ordering = dmplex.get_facet_ordering(self._plex, facet_numbering)
+
+            ## END TODO
+        self._callback = callback
+
 
 
 
@@ -1775,9 +1829,6 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     # all MPI ranks are given the same list of coordinates. This forces
     # all ranks to search for the given coordinates within their cell.
     swarm.setPointCoordinates(coords, redundant=False, mode=PETSc.InsertMode.INSERT_VALUES)
-
-    # # not clear if this needed when running on multiple MPI ranks?
-    # swarm.migrate()
 
     return swarm
 
