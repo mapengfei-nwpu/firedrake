@@ -30,7 +30,7 @@ from firedrake.petsc import PETSc, OptionsManager
 from firedrake.adjoint import MeshGeometryMixin
 
 
-__all__ = ['Mesh', 'ExtrudedMesh', 'SubDomainData', 'unmarked',
+__all__ = ['Mesh', 'ExtrudedMesh', 'VertexOnlyMesh', 'SubDomainData', 'unmarked',
            'DistributedMeshOverlapType']
 
 
@@ -1010,15 +1010,158 @@ class ExtrudedMeshTopology(MeshTopology):
         return cell_data[cell_list]
 
 class VertexOnlyMeshTopology(MeshTopology):
-    """Representation of a vertex-only mesh topology."""
+    """
+    Representation of a vertex-only mesh topology immersed within
+    another mesh.
+    """
 
-    def __init__(self, plex, swarm):
+    def __init__(self, mesh, swarm):
         """
         # to redo
         """
 
         mesh.init()
-        # todo...
+
+        self._base_mesh = mesh
+        self.comm = swarm.comm
+        # self._plex = mesh._plex # Not needed
+        # self._entity_classes = dmplex.get_entity_classes(self._plex).astype(int) # TODO for DMSwarm?
+        # self._plex_renumbering = dmplex.plex_renumbering(self._plex,
+        #                                                  self._entity_classes,
+        #                                                  reordering) # TODO for DMSwarm?
+
+        # self._cell_numbering = super().create_section(entity_dofs) # TODO
+        self._subsets = {}
+        self._ufl_cell = ufl.TensorProductCell(mesh.ufl_cell(), ufl.interval)
+        if layers.shape:
+            self.variable_layers = True
+            extents = extnum.layer_extents(self._plex,
+                                           self._cell_numbering,
+                                           layers)
+            if np.any(extents[:, 3] - extents[:, 2] <= 0):
+                raise NotImplementedError("Vertically disconnected cells unsupported")
+            self.layer_extents = extents
+            """The layer extents for all mesh points.
+
+            For variable layers, the layer extent does not match those for cells.
+            A numpy array of layer extents (in PyOP2 format
+            :math:`[start, stop)`), of shape ``(num_mesh_points, 4)`` where
+            the first two extents are used for allocation and the last
+            two for iteration.
+            """
+        else:
+            self.variable_layers = False
+        self.cell_set = op2.ExtrudedSet(mesh.cell_set, layers=layers)
+
+    @property
+    def name(self):
+        return self._base_mesh.name
+
+    @property
+    def cell_closure(self):
+        """2D array of ordered cell closures
+
+        Each row contains ordered cell entities for a cell, one row per cell.
+        """
+        return self._base_mesh.cell_closure
+
+    def _facets(self, kind):
+        if kind not in ["interior", "exterior"]:
+            raise ValueError("Unknown facet type '%s'" % kind)
+        base = getattr(self._base_mesh, "%s_facets" % kind)
+        return _Facets(self, base.classes,
+                       kind,
+                       base.facet_cell,
+                       base.local_facet_dat.data_ro_with_halos,
+                       markers=base.markers,
+                       unique_markers=base.unique_markers)
+
+    def make_cell_node_list(self, global_numbering, entity_dofs, offsets):
+        """Builds the DoF mapping.
+
+        :arg global_numbering: Section describing the global DoF numbering
+        :arg entity_dofs: FInAT element entity DoFs
+        :arg offsets: layer offsets for each entity dof.
+        """
+        entity_dofs = eutils.flat_entity_dofs(entity_dofs)
+        return super().make_cell_node_list(global_numbering, entity_dofs, offsets)
+
+    def make_dofs_per_plex_entity(self, entity_dofs):
+        """Returns the number of DoFs per plex entity for each stratum,
+        i.e. [#dofs / plex vertices, #dofs / plex edges, ...].
+
+        each entry is a 2-tuple giving the number of dofs on, and
+        above the given plex entity.
+
+        :arg entity_dofs: FInAT element entity DoFs
+
+        """
+        dofs_per_entity = np.zeros((1 + self._base_mesh.cell_dimension(), 2), dtype=IntType)
+        for (b, v), entities in entity_dofs.items():
+            dofs_per_entity[b, v] += len(entities[0])
+        return tuplify(dofs_per_entity)
+
+    def node_classes(self, nodes_per_entity, real_tensorproduct=False):
+        """Compute node classes given nodes per entity.
+
+        :arg nodes_per_entity: number of function space nodes per topological entity.
+        :returns: the number of nodes in each of core, owned, and ghost classes.
+        """
+        if real_tensorproduct:
+            nodes = np.asarray(nodes_per_entity)
+            nodes_per_entity = sum(nodes[:, i] for i in range(2))
+            return super(ExtrudedMeshTopology, self).node_classes(nodes_per_entity)
+        elif self.variable_layers:
+            return extnum.node_classes(self, nodes_per_entity)
+        else:
+            nodes = np.asarray(nodes_per_entity)
+            nodes_per_entity = sum(nodes[:, i]*(self.layers - i) for i in range(2))
+            return super(ExtrudedMeshTopology, self).node_classes(nodes_per_entity)
+
+    def make_offset(self, entity_dofs, ndofs, real_tensorproduct=False):
+        """Returns the offset between the neighbouring cells of a
+        column for each DoF.
+
+        :arg entity_dofs: FInAT element entity DoFs
+        :arg ndofs: number of DoFs in the FInAT element
+        """
+        entity_offset = [0] * (1 + self._base_mesh.cell_dimension())
+        for (b, v), entities in entity_dofs.items():
+            entity_offset[b] += len(entities[0])
+
+        dof_offset = np.zeros(ndofs, dtype=IntType)
+        if not real_tensorproduct:
+            for (b, v), entities in entity_dofs.items():
+                for dof_indices in entities.values():
+                    for i in dof_indices:
+                        dof_offset[i] = entity_offset[b]
+        return dof_offset
+
+    @utils.cached_property
+    def layers(self):
+        """Return the number of layers of the extruded mesh
+        represented by the number of occurences of the base mesh."""
+        if self.variable_layers:
+            raise ValueError("Can't ask for mesh layers with variable layers")
+        else:
+            return self.cell_set.layers
+
+    def entity_layers(self, height, label=None):
+        """Return the number of layers on each entity of a given plex
+        height.
+
+        :arg height: The height of the entity to compute the number of
+           layers (0 -> cells, 1 -> facets, etc...)
+        :arg label: An optional label name used to select points of
+           the given height (if None, then all points are used).
+        :returns: a numpy array of the number of layers on the asked
+           for entities (or a single layer number for the constant
+           layer case).
+        """
+        if self.variable_layers:
+            return extnum.entity_layers(self, height, label)
+        else:
+            return self.cell_set.layers
 
 
 
@@ -1580,11 +1723,10 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     # what mesh should it be defined on?
     # How would I deal with the points moving if the geometry is set by
     # a function?
-    element = ufl.FiniteElement("DG", ufl.interval, 0)
+
+    cell = ufl.Cell('vertex')
+    element = ufl.FiniteElement("DG", cell, 0)
     newmesh = MeshGeometry.__new__(MeshGeometry, element)
-
-
-    self._base_mesh = mesh
 
 def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     """
