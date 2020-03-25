@@ -2059,8 +2059,8 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     cell = tcell.reconstruct(geometric_dimension=gdim)
     element = ufl.VectorElement("Lagrange", cell, 1)
     # Create mesh object
-    mesh = MeshGeometry.__new__(MeshGeometry, element)
-    mesh._topology = topology
+    vmesh = MeshGeometry.__new__(MeshGeometry, element)
+    vmesh._topology = topology
 
     def callback(self):
         """Finish initialisation."""
@@ -2080,8 +2080,8 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
 
         self.__init__(coordinates)
 
-    mesh._callback = callback
-    return mesh
+    vmesh._callback = callback
+    return vmesh
 
 
 
