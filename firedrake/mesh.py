@@ -2043,12 +2043,16 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     import firedrake.functionspace as functionspace
 
     mesh.init()
+
     vertexcoords = np.asarray(vertexcoords, dtype=np.double)
     gdim = mesh.geometric_dimension()
     tdim = mesh.topological_dimension()
     pdim = np.shape(vertexcoords)[1]
     if pdim != tdim:
         raise ValueError(f"Mesh topological dimension {tdim} must match point list dimension {pdim}")
+
+    if mesh.coordinates.function_space().ufl_element().degree() > 1:
+        raise NotImplementedError("Only straight edged meshes are supported")
 
     swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
 
@@ -2103,6 +2107,10 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     Note that, at present, no fields are associated with the DMSwarm
     particles.
 
+    This should only by used for dmplexes associated with meshes with
+    straight edges. If not, the particles may be placed in the wrong
+    cells.
+
     :arg dmplex: the DMPlex within with the DMSwarm should be
         immersed.
     :arg coords: the point coordinates at which to create the
@@ -2146,6 +2154,10 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     # all MPI ranks are given the same list of coordinates. This forces
     # all ranks to search for the given coordinates within their cell.
     swarm.setPointCoordinates(coords, redundant=False, mode=PETSc.InsertMode.INSERT_VALUES)
+
+    # Some different method of matching points to cells will need to be
+    # used for bendy meshes since PETSc only supports straight-edged
+    # mesh topologies.
 
     return swarm
 
