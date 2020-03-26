@@ -36,7 +36,6 @@ __all__ = ['Mesh', 'ExtrudedMesh', 'VertexOnlyMesh', 'SubDomainData', 'unmarked'
 
 
 _cells = {
-    0: {1: "vertex"},
     1: {2: "interval"},
     2: {3: "triangle", 4: "quadrilateral"},
     3: {4: "tetrahedron"}
@@ -1017,7 +1016,7 @@ class VertexOnlyMeshTopology(MeshTopology):
     another mesh.
     """
 
-    def __init__(self, swarm, parentmesh, name, reorder, distribution_parameters):
+    def __init__(self, swarm, parentmesh, name, reorder):
         """
         Half-initialise a mesh topology.
 
@@ -1028,53 +1027,19 @@ class VertexOnlyMeshTopology(MeshTopology):
             topology is immersed.
         :arg name: name of the mesh
         :arg reorder: whether to reorder the mesh (bool)
-        :arg distribution_parameters: options controlling mesh
-            distribution, see :func:`Mesh` for details.
         """
         # Do some validation of the input DMSwarm
 
-        distribute = distribution_parameters.get("partition")
-        self._distribution_parameters = distribution_parameters.copy()
-        if distribute is None:
-            distribute = True
-
-        ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-        # overlap_type, overlap = distribution_parameters.get("overlap_type",
-        #                                                     (DistributedMeshOverlapType.FACET, 1))
-
-        # if overlap < 0:
-        #     raise ValueError("Overlap depth must be >= 0")
-        # if overlap_type == DistributedMeshOverlapType.NONE:
-        #     def add_overlap():
-        #         pass
-        #     if overlap > 0:
-        #         raise ValueError("Can't have NONE overlap with overlap > 0")
-        # elif overlap_type == DistributedMeshOverlapType.FACET:
-        #     def add_overlap():
-        #         dmplex.set_adjacency_callback(self._plex)
-        #         self._plex.distributeOverlap(overlap)
-        #         dmplex.clear_adjacency_callback(self._plex)
-        #         self._grown_halos = True
-        # elif overlap_type == DistributedMeshOverlapType.VERTEX:
-        #     def add_overlap():
-        #         # Default is FEM (vertex star) adjacency.
-        #         self._plex.distributeOverlap(overlap)
-        #         self._grown_halos = True
-        # else:
-        #     raise ValueError("Unknown overlap type %r" % overlap_type)
-
-        ## END POTENTIALLY NOT RELEVANT ##
-
+        if reorder is True:
+            raise NotImplementedError("Mesh reordering not implemented for vertex only meshes yet.")
 
         ## BEGIN TODO
 
-        # dmplex.validate_mesh(plex) # create equivalent for DMSwarm
+        # dmplex.validate_mesh(plex) # create equivalent for DMSwarm?
 
         ## END TODO
 
-        swarm.setFromOptions() # Needed?
-
+        swarm.setFromOptions()
 
         utils._init()
 
@@ -1089,76 +1054,9 @@ class VertexOnlyMeshTopology(MeshTopology):
         # Cell subsets for integration over subregions
         self._subsets = {}
 
-        ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-        # # Mark exterior and interior facets
-        # label_boundary = (self.comm.size == 1) or distribute
-        # dmplex.label_facets(plex, label_boundary=label_boundary)
-
-        ## END POTENTIALLY NOT RELEVANT ##
-
-        # Distribute the dm to all ranks
-        if self.comm.size > 1 and distribute:
-
-            ## BEGIN TODO
-
-            # not clear if this needed when running on multiple MPI ranks?
-            # neet to use intelligently in conjunction with
-            # swarm.setPointCoordinates `redundency` kwarg.
-            swarm.migrate()
-
-            ## END TODO
-
-
-            ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-            # # We distribute with overlap zero, in case we're going to
-            # # refine this mesh in parallel.  Later, when we actually use
-            # # it, we grow the halo.
-            # partitioner = plex.getPartitioner()
-            # if IntType.itemsize == 8:
-            #     # Default to PTSCOTCH on 64bit ints (Chaco is 32 bit int only)
-            #     from firedrake_configuration import get_config
-            #     if get_config().get("options", {}).get("with_parmetis", False):
-            #         partitioner.setType(partitioner.Type.PARMETIS)
-            #     else:
-            #         partitioner.setType(partitioner.Type.PTSCOTCH)
-            # else:
-            #     partitioner.setType(partitioner.Type.CHACO)
-            # try:
-            #     sizes, points = distribute
-            #     partitioner.setType(partitioner.Type.SHELL)
-            #     partitioner.setShellPartition(self.comm.size, sizes, points)
-            # except TypeError:
-            #     pass
-            # partitioner.setFromOptions()
-            # plex.distribute(overlap=0)
-
-            ## END POTENTIALLY NOT RELEVANT ##
-
-        # dim = swarm.getDimension()
         dim = 0
-        nfacets = 1
 
-        ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-        # # Allow empty local meshes on a process
-        # cStart, cEnd = plex.getHeightStratum(0)  # cells
-        # if cStart == cEnd:
-        #     nfacets = -1
-        # else:
-        #     nfacets = plex.getConeSize(cStart)
-
-        # this needs to be updated for mixed-cell meshes.
-        # nfacets = self.comm.allreduce(nfacets, op=MPI.MAX)
-
-
-        # self._grown_halos = False
-
-        ## END POTENTIALLY NOT RELEVANT ##
-
-
-        self._ufl_cell = ufl.Cell(_cells[dim][nfacets])
+        self._ufl_cell = ufl.Cell("vertex")
 
         # A set of weakrefs to meshes that are explicitly labelled as being
         # parallel-compatible for interpolation/projection/supermeshing
@@ -1170,34 +1068,10 @@ class VertexOnlyMeshTopology(MeshTopology):
             """Finish initialisation."""
             del self._callback
 
-            ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-            # if self.comm.size > 1:
-            #     add_overlap()
-
-            # if reorder:
-            #     with timed_region("Mesh: reorder"):
-            #         old_to_new = self._plex.getOrdering(PETSc.Mat.OrderingType.RCM).indices
-            #         reordering = np.empty_like(old_to_new)
-            #         reordering[old_to_new] = np.arange(old_to_new.size, dtype=old_to_new.dtype)
-            # else:
-            #     # No reordering
-            #     reordering = None
-            # self._did_reordering = bool(reorder)
-
-            ## END POTENTIALLY NOT RELEVANT ##
-
-
             # Mark OP2 entities and derive the resulting Swarm numbering
             with timed_region("Mesh: numbering"):
                 dmswarm.mark_entity_classes(self._swarm)
                 self._entity_classes = dmswarm.get_entity_classes(self._swarm).astype(int)
-
-                ## BEGIN POTENTIALLY NOT RELEVANT ##
-                # self._plex_renumbering = dmplex.plex_renumbering(self._plex,
-                #                                                  self._entity_classes,
-                #                                                  reordering)
-                ## END POTENTIALLY NOT RELEVANT ##
 
                 # Derive a cell numbering from the Swarm numbering
                 entity_dofs = np.zeros(dim+1, dtype=IntType)
@@ -1207,13 +1081,6 @@ class VertexOnlyMeshTopology(MeshTopology):
                 entity_dofs[:] = 0
                 entity_dofs[0] = 1
                 self._vertex_numbering = self.create_section(entity_dofs)
-
-                ## BEGIN POTENTIALLY NOT RELEVANT ##
-                # entity_dofs[:] = 0
-                # entity_dofs[-2] = 1
-                # facet_numbering = self.create_section(entity_dofs)
-                # self._facet_ordering = dmplex.get_facet_ordering(self._plex, facet_numbering)
-                ## END POTENTIALLY NOT RELEVANT ##
 
         self._callback = callback
 
@@ -2057,7 +1924,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
 
     # Topology
-    topology = VertexOnlyMeshTopology(swarm, mesh.topology, name="swarmmesh", reorder=False, distribution_parameters={})
+    topology = VertexOnlyMeshTopology(swarm, mesh.topology, name="swarmmesh", reorder=False)
 
     # Geometry
     tcell = topology.ufl_cell()
