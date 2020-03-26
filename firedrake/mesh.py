@@ -1073,17 +1073,13 @@ class VertexOnlyMeshTopology(MeshTopology):
 
         ## END TODO
 
-
-        ## BEGIN POTENTIALLY NOT RELEVANT ##
-
-        # plex.setFromOptions() # not needed
-
-        ## END POTENTIALLY NOT RELEVANT ##
+        swarm.setFromOptions() # Needed?
 
 
         utils._init()
 
         self._parent_mesh = parentmesh
+        self._swarm = swarm
         self.name = name
         self.comm = dup_comm(swarm.comm.tompi4py())
 
@@ -1153,7 +1149,7 @@ class VertexOnlyMeshTopology(MeshTopology):
         # else:
         #     nfacets = plex.getConeSize(cStart)
 
-        # # TODO: this needs to be updated for mixed-cell meshes.
+        # this needs to be updated for mixed-cell meshes.
         # nfacets = self.comm.allreduce(nfacets, op=MPI.MAX)
 
 
@@ -1175,6 +1171,7 @@ class VertexOnlyMeshTopology(MeshTopology):
             del self._callback
 
             ## BEGIN POTENTIALLY NOT RELEVANT ##
+
             # if self.comm.size > 1:
             #     add_overlap()
 
@@ -1186,35 +1183,38 @@ class VertexOnlyMeshTopology(MeshTopology):
             # else:
             #     # No reordering
             #     reordering = None
+            # self._did_reordering = bool(reorder)
+
             ## END POTENTIALLY NOT RELEVANT ##
-            self._did_reordering = bool(reorder)
 
 
-            ## BEGIN TODO
+            # Mark OP2 entities and derive the resulting Swarm numbering
+            with timed_region("Mesh: numbering"):
+                dmswarm.mark_entity_classes(self._swarm)
+                self._entity_classes = dmswarm.get_entity_classes(self._swarm).astype(int)
 
-            # # Mark OP2 entities and derive the resulting Plex renumbering
-            # with timed_region("Mesh: numbering"):
-            #     dmplex.mark_entity_classes(self._plex)
-            #     self._entity_classes = dmplex.get_entity_classes(self._plex).astype(int)
-            #     self._plex_renumbering = dmplex.plex_renumbering(self._plex,
-            #                                                      self._entity_classes,
-            #                                                      reordering)
+                ## BEGIN POTENTIALLY NOT RELEVANT ##
+                # self._plex_renumbering = dmplex.plex_renumbering(self._plex,
+                #                                                  self._entity_classes,
+                #                                                  reordering)
+                ## END POTENTIALLY NOT RELEVANT ##
 
-            #     # Derive a cell numbering from the Plex renumbering
-            #     entity_dofs = np.zeros(dim+1, dtype=IntType)
-            #     entity_dofs[-1] = 1
+                # Derive a cell numbering from the Swarm numbering
+                entity_dofs = np.zeros(dim+1, dtype=IntType)
+                entity_dofs[-1] = 1
 
-            #     self._cell_numbering = self.create_section(entity_dofs)
-            #     entity_dofs[:] = 0
-            #     entity_dofs[0] = 1
-            #     self._vertex_numbering = self.create_section(entity_dofs)
+                self._cell_numbering = self.create_section(entity_dofs)
+                entity_dofs[:] = 0
+                entity_dofs[0] = 1
+                self._vertex_numbering = self.create_section(entity_dofs)
 
-            #     entity_dofs[:] = 0
-            #     entity_dofs[-2] = 1
-            #     facet_numbering = self.create_section(entity_dofs)
-            #     self._facet_ordering = dmplex.get_facet_ordering(self._plex, facet_numbering)
+                ## BEGIN POTENTIALLY NOT RELEVANT ##
+                # entity_dofs[:] = 0
+                # entity_dofs[-2] = 1
+                # facet_numbering = self.create_section(entity_dofs)
+                # self._facet_ordering = dmplex.get_facet_ordering(self._plex, facet_numbering)
+                ## END POTENTIALLY NOT RELEVANT ##
 
-            ## END TODO
         self._callback = callback
 
     ## BEGIN TODO
@@ -1335,13 +1335,13 @@ class VertexOnlyMeshTopology(MeshTopology):
     #     return op2.Dat(dataset, cell_facets, dtype=cell_facets.dtype,
     #                    name="cell-to-local-facet-dat")
 
-    # def create_section(self, nodes_per_entity, real_tensorproduct=False):
-    #     """Create a PETSc Section describing a function space.
+    def create_section(self, nodes_per_entity, real_tensorproduct=False):
+        """Create a PETSc Section describing a function space.
 
-    #     :arg nodes_per_entity: number of function space nodes per topological entity.
-    #     :returns: a new PETSc Section.
-    #     """
-    #     return dmplex.create_section(self, nodes_per_entity, on_base=real_tensorproduct)
+        :arg nodes_per_entity: number of function space nodes per topological entity.
+        :returns: a new PETSc Section.
+        """
+        return dmswarm.create_section(self, nodes_per_entity, on_base=real_tensorproduct)
 
     # def node_classes(self, nodes_per_entity, real_tensorproduct=False):
     #     """Compute node classes given nodes per entity.
