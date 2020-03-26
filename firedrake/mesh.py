@@ -18,6 +18,7 @@ from pyop2.profiling import timed_function, timed_region
 from pyop2.utils import as_tuple, tuplify
 
 import firedrake.cython.dmplex as dmplex
+import firedrake.cython.dmswarm as dmswarm
 import firedrake.expression as expression
 import firedrake.cython.extrusion_numbering as extnum
 import firedrake.extrusion_utils as eutils
