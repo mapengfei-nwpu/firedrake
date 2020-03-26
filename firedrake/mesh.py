@@ -2118,8 +2118,10 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     swarm = PETSc.DMSwarm().create(comm=comm)
 
     # Set swarm DM dimension to match DMPlex dimension
-    # NB: you aren't allowed to set it to have dimension 0 which would
-    #     technically be correct for a vertex only mesh topology.
+    # NB: Unlike a DMPlex, this does not correspond to the topological
+    #     dimension of a mesh (which would be 0). In all PETSc examples
+    #     the dimension of the DMSwarm is set to match that of the
+    #     DMPlex used with swarm.setCellDM
     swarm.setDimension(dmplex.getDimension())
 
     # Set coordinates dimension
