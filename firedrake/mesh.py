@@ -1908,7 +1908,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
     # Geometry
     tcell = topology.ufl_cell()
     cell = tcell.reconstruct(geometric_dimension=gdim)
-    element = ufl.VectorElement("Lagrange", cell, 1)
+    element = ufl.VectorElement("DG", cell, 0)
     # Create mesh object
     vmesh = MeshGeometry.__new__(MeshGeometry, element)
     vmesh._topology = topology
@@ -1919,7 +1919,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
         # Finish the initialisation of mesh topology
         self.topology.init()
 
-        coordinates_fs = functionspace.VectorFunctionSpace(self.topology, "Lagrange", 1,
+        coordinates_fs = functionspace.VectorFunctionSpace(self.topology, "DG", 0,
                                                            dim=gdim)
 
         coordinates_data = dmplex.reordered_coords(plex, coordinates_fs.dm.getDefaultSection(),
