@@ -17,11 +17,16 @@ def test_pic_swarm_in_plex():
 def test_pic_swarm_in_plex_parallel():
     test_pic_swarm_in_plex()
 
+def validate_vertexonly_mesh(m, vm):
+    # test that the mesh properties are as expected
+    vm.init()
+    #TODO
+
 def test_generate():
     m = UnitSquareMesh(5,5)
     vertexcoords = [(.1, .1), (.2, .3), (.7, .8)]
     vm = VertexOnlyMesh(m, vertexcoords)
-    vm.init()
+    validate_vertexonly_mesh(m, vm)
 
 # remove this before final merge
 if __name__ == "__main__":
