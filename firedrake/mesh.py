@@ -1086,18 +1086,19 @@ class VertexOnlyMeshTopology(MeshTopology):
 
     ## BEGIN TODO
 
+    # NOTE: cell_closure has already been partly modified.
     # @property
     # def cell_closure(self):
     #     """2D array of ordered cell closures
 
     #     Each row contains ordered cell entities for a cell, one row per cell.
     #     """
-    #     plex = self._plex
-    #     dim = plex.getDimension()
+    #     swarm = self._swarm
+    #     dim = 0
 
     #     # Cell numbering and global vertex numbering
     #     cell_numbering = self._cell_numbering
-    #     vertex_numbering = self._vertex_numbering.createGlobalSection(plex.getPointSF())
+    #     vertex_numbering = self._vertex_numbering.createGlobalSection(swarm.getPointSF())
 
     #     cell = self.ufl_cell()
     #     assert dim == cell.topological_dimension()
@@ -1108,30 +1109,8 @@ class VertexOnlyMeshTopology(MeshTopology):
     #         for d, ents in topology.items():
     #             entity_per_cell[d] = len(ents)
 
-    #         return dmplex.closure_ordering(plex, vertex_numbering,
-    #                                        cell_numbering, entity_per_cell)
-
-    #     elif cell.cellname() == "quadrilateral":
-    #         from firedrake_citations import Citations
-    #         Citations().register("Homolya2016")
-    #         Citations().register("McRae2016")
-    #         # Quadrilateral mesh
-    #         cell_ranks = dmplex.get_cell_remote_ranks(plex)
-
-    #         facet_orientations = dmplex.quadrilateral_facet_orientations(
-    #             plex, vertex_numbering, cell_ranks)
-
-    #         cell_orientations = dmplex.orientations_facet2cell(
-    #             plex, vertex_numbering, cell_ranks,
-    #             facet_orientations, cell_numbering)
-
-    #         dmplex.exchange_cell_orientations(plex,
-    #                                           cell_numbering,
-    #                                           cell_orientations)
-
-    #         return dmplex.quadrilateral_closure_ordering(
-    #             plex, vertex_numbering, cell_numbering, cell_orientations)
-
+    #         return dmswarm.closure_ordering(swarm, vertex_numbering,
+    #                                         cell_numbering, entity_per_cell)
     #     else:
     #         raise NotImplementedError("Cell type '%s' not supported." % cell)
 
