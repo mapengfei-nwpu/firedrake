@@ -1979,7 +1979,9 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     swarm.setDimension(dmplex.getDimension())
 
     # Set coordinates dimension
-    if len(np.shape(coords)) == 2:
+    if len(np.shape(coords)) == 1:
+        coordsdim = 1
+    elif len(np.shape(coords)) == 2:
         coordsdim = np.shape(coords)[1]
     else:
         raise ValueError("Point coordinates list shape unsupported")
