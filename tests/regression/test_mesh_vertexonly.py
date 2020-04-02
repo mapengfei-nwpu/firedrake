@@ -10,8 +10,8 @@ def cell_midpoints(m):
     # since mesh may be distributed, midpoints may not be the same on
     # all ranks. Therefore need to gather...
     all_midpoints = np.empty((m.num_cells(), m.cell_dimension()), dtype=float)
-    # MPI.COMM_WORLD.Allgather(midpoints, all_midpoints)
-    all_midpoints = MPI.COMM_WORLD.allgather(f.dat.data)
+    MPI.COMM_WORLD.Allgatherv(midpoints, all_midpoints)
+    # all_midpoints = MPI.COMM_WORLD.allgather(f.dat.data)
     # below will fail if there are empty entries
     return np.asarray(all_midpoints)
 
