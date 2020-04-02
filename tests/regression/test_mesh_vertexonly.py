@@ -3,19 +3,23 @@ import numpy as np
 
 from firedrake import *
 
-def test_pic_swarm_in_plex():
+@pytest.mark.parallel(nprocs=2)
+def test_pic_swarm_in_plex_2procs():
+    from mpi4py import MPI
+    # Mesh with two cells
     m = UnitSquareMesh(1,1)
-    points = [(.1, .1), (.9, .9)]
+    # 4 points such that there are two per cell
+    points = [(.1, .1), (.2, .2), (.8, .8), (.9, .9)]
     plex = m.topology._plex
     swarm = mesh._pic_swarm_in_plex(plex, points)
-    # Now somehow check that points are in each cell as expected
-    #TODO
-    # Then check that distribution has worked across MPI ranks as expected
-    #TODO
-
-@pytest.mark.parallel(nprocs=2)
-def test_pic_swarm_in_plex_parallel():
-    test_pic_swarm_in_plex()
+    # Check how many points are on current MPI rank
+    nlocal = swarm.getLocalSize()
+    # Check total number of points on all MPI ranks is correct
+    nglobal = MPI.COMM_WORLD.allreduce(nlocal, op=MPI.SUM)
+    assert nglobal == len(points)
+    assert nglobal == swarm.getSize()
+    # Now check that we have two points in each cell as expected
+    assert nlocal == 2
 
 def verify_vertexonly_mesh(m, vm):
     # test that the mesh properties are as expected
