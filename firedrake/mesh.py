@@ -1959,8 +1959,8 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
 
     :arg dmplex: the DMPlex within with the DMSwarm should be
         immersed.
-    :arg coords: the point coordinates at which to create the
-        particles.
+    :arg coords: a list of point coordinate tuples at which to create
+        the particles.
     :kwarg comm: Optional communicator to build the mesh on
         (defaults to COMM_WORLD).
     :return: the immersed DMSwarm
@@ -1979,7 +1979,17 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     swarm.setDimension(dmplex.getDimension())
 
     # Set coordinates dimension
-    swarm.setCoordinateDim(np.shape(coords)[1])
+    if len(np.shape(coords)) == 1:
+        coordsdim = 1
+    elif len(np.shape(coords)) == 2:
+        coordsdim = np.shape(coords)[1]
+    else:
+        raise ValueError("Point coordinates list shape unsupported")
+    swarm.setCoordinateDim(coordsdim)
+
+    # If (x,1) array, make into (x,) vector
+    if coordsdim == 1:
+        np.reshape(coords, (len(coords),))
 
     # Link to DMPlex cells information for when swarm.migrate() is used
     swarm.setCellDM(dmplex)
