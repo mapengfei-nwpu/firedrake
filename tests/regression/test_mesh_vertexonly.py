@@ -17,8 +17,16 @@ def cell_midpoints(m):
 def _test_pic_swarm_in_plex(m, points):
     plex = m.topology._plex
     swarm = mesh._pic_swarm_in_plex(plex, points)
+    # Get point coords on current MPI rank
+    localpoints = swarm.getField("DMSwarmPIC_coor")
+    localpoints_cpy = np.copy(localpoints)
+    swarm.restoreField("DMSwarmPIC_coor")
+    # check points are found in list of points
+    localpoints_cpy = np.reshape(localpoints_cpy, (-1, points.shape[1]))
+    for p in localpoints_cpy:
+        assert np.any(np.isclose(p, points))
     # Check how many points are on current MPI rank
-    nlocal = swarm.getLocalSize()
+    nlocal = len(localpoints_cpy)
     # Check total number of points on all MPI ranks is correct
     nglobal = MPI.COMM_WORLD.allreduce(nlocal, op=MPI.SUM)
     assert nglobal == len(points)
