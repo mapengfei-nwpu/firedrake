@@ -6,14 +6,13 @@ from mpi4py import MPI
 def cell_midpoints(m):
     V = VectorFunctionSpace(m, "DG", 0)
     f = Function(V).interpolate(m.coordinates)
-    midpoints = f.dat.data_ro
-    # since mesh may be distributed, midpoints may not be the same on
-    # all ranks. Therefore need to gather...
-    all_midpoints = np.empty((m.num_cells(), m.cell_dimension()), dtype=float)
-    MPI.COMM_WORLD.Allgatherv(midpoints, all_midpoints)
-    # all_midpoints = MPI.COMM_WORLD.allgather(f.dat.data)
-    # below will fail if there are empty entries
-    return np.asarray(all_midpoints)
+    # since mesh may be distributed, the number of cells may not be the same on
+    # all ranks
+    num_cells = MPI.COMM_WORLD.allreduce(m.cell_set.size, op=MPI.SUM)
+    midpoints = np.empty((num_cells, m.cell_dimension()), dtype=float)
+    local_midpoints = f.dat.data_ro
+    MPI.COMM_WORLD.Allgatherv(local_midpoints, midpoints)
+    return midpoints
 
 def _test_pic_swarm_in_plex(m, points):
     plex = m.topology._plex
