@@ -4,16 +4,24 @@ import numpy as np
 from mpi4py import MPI
 
 def cell_midpoints(m):
+    """Get the coordinates of the midpoints of every cell in mesh `m`.
+    The mesh may be distributed, but the midpoints are returned for the
+    entire mesh as though it were not distributed."""
     m.init()
     V = VectorFunctionSpace(m, "DG", 0)
     f = Function(V).interpolate(m.coordinates)
-    # since mesh may be distributed, the number of cells may not be the same on
-    # all ranks (we exclude ghost cells hence using m.cell_set.size)
+    # since mesh may be distributed, the number of cells on the MPI rank
+    # may not be the same on all ranks (note we exclude ghost cells
+    # hence using num_cells_local = m.cell_set.size). Below local means
+    # MPI rank local.
     num_cells_local = m.cell_set.size
     num_cells = MPI.COMM_WORLD.allreduce(num_cells_local, op=MPI.SUM)
-    midpoints = np.empty((num_cells, m.cell_dimension()), dtype=float)
     local_midpoints = f.dat.data_ro
-    MPI.COMM_WORLD.Allgatherv(local_midpoints, midpoints)
+    local_midpoints_size = np.array(local_midpoints.size)
+    local_midpoints_sizes = np.empty(MPI.COMM_WORLD.size, dtype=int)
+    MPI.COMM_WORLD.Allgatherv(local_midpoints_size, local_midpoints_sizes)
+    midpoints = np.empty((num_cells, m.cell_dimension()), dtype=float)
+    MPI.COMM_WORLD.Allgatherv(local_midpoints, (midpoints, local_midpoints_sizes))
     assert len(np.unique(midpoints, axis=0)) == len(midpoints)
     return midpoints
 
@@ -62,14 +70,14 @@ def _test_pic_swarm_in_plex_2d():
     m = UnitSquareMesh(1,1)
     _test_pic_swarm_in_plex(m)
 
-def test_pic_swarm_in_plex_2d():
+def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
     _test_pic_swarm_in_plex_2d()
 
-@pytest.mark.parallel(nprocs=2)
+@pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
 def test_pic_swarm_in_plex_2d_2procs():
     _test_pic_swarm_in_plex_2d()
 
-@pytest.mark.parallel(nprocs=3)
+@pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
 def test_pic_swarm_in_plex_2d_3procs():
     _test_pic_swarm_in_plex_2d()
 
