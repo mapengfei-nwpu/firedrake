@@ -14,23 +14,29 @@ def cell_midpoints(m):
     MPI.COMM_WORLD.Allgatherv(local_midpoints, midpoints)
     return midpoints
 
-def _test_pic_swarm_in_plex(m, points):
+def _test_pic_swarm_in_plex(m):
+    """Generate points in cell midpoints of mesh `m` and check correct
+    swarm is created in plex."""
+    pointcoords = cell_midpoints(m)
+    assert len(np.unique(pointcoords, axis=0)) == len(pointcoords)
     plex = m.topology._plex
-    swarm = mesh._pic_swarm_in_plex(plex, points)
+    swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
     # Get point coords on current MPI rank
-    localpoints = swarm.getField("DMSwarmPIC_coor")
-    localpoints_cpy = np.copy(localpoints)
+    localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
     swarm.restoreField("DMSwarmPIC_coor")
-    # check points are found in list of points
-    localpoints_cpy = np.reshape(localpoints_cpy, (-1, points.shape[1]))
-    for p in localpoints_cpy:
-        assert np.any(np.isclose(p, points))
-    # Check how many points are on current MPI rank
-    nlocal = len(localpoints_cpy)
+    # check local points are found in list of points
+    localpointcoords = np.reshape(localpointcoords, (-1, pointcoords.shape[1]))
+    for p in localpointcoords:
+        assert np.any(np.isclose(p, pointcoords))
+    # Check methods for checking number of points on current MPI rank
+    assert len(localpointcoords) == swarm.getLocalSize()
+    # Check there are as many local points as there are local cells
+    assert len(localpointcoords) == m.cell_set.size
     # Check total number of points on all MPI ranks is correct
-    nglobal = MPI.COMM_WORLD.allreduce(nlocal, op=MPI.SUM)
-    assert nglobal == len(points)
-    assert nglobal == swarm.getSize()
+    nptslocal = len(localpointcoords)
+    nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
+    assert nptsglobal == len(pointcoords)
+    assert nptsglobal == swarm.getSize()
     # Check each cell has the correct point associated with it
     #TODO
 
@@ -39,17 +45,17 @@ def _test_pic_swarm_in_plex(m, points):
 def test_pic_swarm_in_plex_1d():
     with pytest.raises(NotImplementedError):
         m = UnitIntervalMesh(1)
-        _test_pic_swarm_in_plex(m, cell_midpoints(m))
+        _test_pic_swarm_in_plex(m)
 
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_2d():
     m = UnitSquareMesh(1,1)
-    _test_pic_swarm_in_plex(m, cell_midpoints(m))
+    _test_pic_swarm_in_plex(m)
 
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_3d():
     m = UnitCubeMesh(1,1,1)
-    _test_pic_swarm_in_plex(m, cell_midpoints(m))
+    _test_pic_swarm_in_plex(m)
 
 def verify_vertexonly_mesh(m, vm):
     # test that the mesh properties are as expected
