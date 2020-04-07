@@ -9,7 +9,8 @@ def cell_midpoints(m):
     f = Function(V).interpolate(m.coordinates)
     # since mesh may be distributed, the number of cells may not be the same on
     # all ranks (we exclude ghost cells hence using m.cell_set.size)
-    num_cells = MPI.COMM_WORLD.allreduce(m.cell_set.size, op=MPI.SUM)
+    num_cells_local = m.cell_set.size
+    num_cells = MPI.COMM_WORLD.allreduce(num_cells_local, op=MPI.SUM)
     midpoints = np.empty((num_cells, m.cell_dimension()), dtype=float)
     local_midpoints = f.dat.data_ro
     MPI.COMM_WORLD.Allgatherv(local_midpoints, midpoints)
@@ -56,10 +57,21 @@ def test_pic_swarm_in_plex_1d():
         m = UnitIntervalMesh(1)
         _test_pic_swarm_in_plex(m)
 
-@pytest.mark.parallel(nprocs=2)
-def test_pic_swarm_in_plex_2d():
+# Need to test cases with 2 cells across 1, 2 and 3 processors
+def _test_pic_swarm_in_plex_2d():
     m = UnitSquareMesh(1,1)
     _test_pic_swarm_in_plex(m)
+
+def test_pic_swarm_in_plex_2d():
+    _test_pic_swarm_in_plex_2d()
+
+@pytest.mark.parallel(nprocs=2)
+def test_pic_swarm_in_plex_2d_2procs():
+    _test_pic_swarm_in_plex_2d()
+
+@pytest.mark.parallel(nprocs=3)
+def test_pic_swarm_in_plex_2d_3procs():
+    _test_pic_swarm_in_plex_2d()
 
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_3d():
