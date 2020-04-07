@@ -4,38 +4,47 @@ import numpy as np
 from mpi4py import MPI
 
 def cell_midpoints(m):
+    m.init()
     V = VectorFunctionSpace(m, "DG", 0)
     f = Function(V).interpolate(m.coordinates)
     # since mesh may be distributed, the number of cells may not be the same on
-    # all ranks
+    # all ranks (we exclude ghost cells hence using m.cell_set.size)
     num_cells = MPI.COMM_WORLD.allreduce(m.cell_set.size, op=MPI.SUM)
     midpoints = np.empty((num_cells, m.cell_dimension()), dtype=float)
     local_midpoints = f.dat.data_ro
     MPI.COMM_WORLD.Allgatherv(local_midpoints, midpoints)
+    assert len(np.unique(midpoints, axis=0)) == len(midpoints)
     return midpoints
 
 def _test_pic_swarm_in_plex(m):
     """Generate points in cell midpoints of mesh `m` and check correct
     swarm is created in plex."""
+    m.init()
     pointcoords = cell_midpoints(m)
-    assert len(np.unique(pointcoords, axis=0)) == len(pointcoords)
     plex = m.topology._plex
     swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
+    # Check comm sizes match
+    assert plex.comm.size == swarm.comm.size
     # Get point coords on current MPI rank
     localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
     swarm.restoreField("DMSwarmPIC_coor")
+    if len(pointcoords.shape) > 1:
+        localpointcoords = np.reshape(localpointcoords, (-1, pointcoords.shape[1]))
     # check local points are found in list of points
-    localpointcoords = np.reshape(localpointcoords, (-1, pointcoords.shape[1]))
     for p in localpointcoords:
         assert np.any(np.isclose(p, pointcoords))
     # Check methods for checking number of points on current MPI rank
     assert len(localpointcoords) == swarm.getLocalSize()
     # Check there are as many local points as there are local cells
-    assert len(localpointcoords) == m.cell_set.size
+    # (including ghost cells in the halo)
+    assert len(localpointcoords) == m.num_cells() == m.cell_set.total_size
     # Check total number of points on all MPI ranks is correct
+    # (excluding ghost cells in the halo)
+    nghostcellslocal = m.cell_set.total_size - m.cell_set.size
+    nghostcellsglobal = MPI.COMM_WORLD.allreduce(nghostcellslocal, op=MPI.SUM)
     nptslocal = len(localpointcoords)
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
-    assert nptsglobal == len(pointcoords)
+    assert nptsglobal-nghostcellsglobal == len(pointcoords)
     assert nptsglobal == swarm.getSize()
     # Check each cell has the correct point associated with it
     #TODO
