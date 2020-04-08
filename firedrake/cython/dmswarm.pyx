@@ -175,7 +175,7 @@ def create_section(mesh, nodes_per_entity, on_base=False):
 
     for i in range(dimension + 1):
         pStart = 0 # by definition since a swarm is point cloud
-        CHKERR(DMSwarmGetSize(dm.dm, &pEnd)) # by definition since a swarm is point cloud
+        CHKERR(DMSwarmGetLocalSize(dm.dm, &pEnd)) # by definition since a swarm is point cloud
         if not variable:
             ndof = nodes[i, 0]
         for p in range(pStart, pEnd):
