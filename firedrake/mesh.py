@@ -1114,51 +1114,8 @@ class VertexOnlyMeshTopology(MeshTopology):
     #     else:
     #         raise NotImplementedError("Cell type '%s' not supported." % cell)
 
-    # def _facets(self, kind):
-    #     if kind not in ["interior", "exterior"]:
-    #         raise ValueError("Unknown facet type '%s'" % kind)
-
-    #     dm = self._plex
-    #     facets, classes = dmplex.get_facets_by_class(dm, (kind + "_facets").encode(),
-    #                                                  self._facet_ordering)
-    #     label = dmplex.FACE_SETS_LABEL
-    #     if dm.hasLabel(label):
-    #         from mpi4py import MPI
-    #         markers = dmplex.get_facet_markers(dm, facets)
-    #         local_markers = set(dm.getLabelIdIS(label).indices)
-
-    #         def merge_ids(x, y, datatype):
-    #             return x.union(y)
-
-    #         op = MPI.Op.Create(merge_ids, commute=True)
-
-    #         unique_markers = np.asarray(sorted(self.comm.allreduce(local_markers, op=op)),
-    #                                     dtype=IntType)
-    #         op.Free()
-    #     else:
-    #         markers = None
-    #         unique_markers = None
-
-    #     local_facet_number, facet_cell = \
-    #         dmplex.facet_numbering(dm, kind, facets,
-    #                                self._cell_numbering,
-    #                                self.cell_closure)
-
-    #     point2facetnumber = np.full(facets.max(initial=0)+1, -1, dtype=IntType)
-    #     point2facetnumber[facets] = np.arange(len(facets), dtype=IntType)
-    #     obj = _Facets(self, classes, kind,
-    #                   facet_cell, local_facet_number,
-    #                   markers, unique_markers=unique_markers)
-    #     obj.point2facetnumber = point2facetnumber
-    #     return obj
-
-    # @utils.cached_property
-    # def exterior_facets(self):
-    #     return self._facets("exterior")
-
-    # @utils.cached_property
-    # def interior_facets(self):
-    #     return self._facets("interior")
+    def _facets(self, kind):
+        return None
 
     # @utils.cached_property
     # def cell_to_facets(self):
