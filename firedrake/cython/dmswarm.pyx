@@ -11,7 +11,6 @@ from libc.stdlib cimport qsort
 cimport numpy as np
 cimport mpi4py.MPI as MPI
 cimport petsc4py.PETSc as PETSc
-import firedrake.cython.dmplex as dmplex
 
 np.import_array()
 
@@ -198,6 +197,9 @@ def closure_ordering(PETSc.DM swarm,
                      np.ndarray[PetscInt, ndim=1, mode="c"] entity_per_cell):
     """Apply Fenics local numbering to a cell closure.
 
+    Note that this is a copy and paste job from the equivalent function
+    in dmplex.pyx with the relevant modifications made for a DMSwarm.
+
     :arg swarm: The DMSwarm object encapsulating the vertex-only mesh topology
     :arg vertex_numbering: Section describing the universal vertex numbering
     :arg cell_numbering: Section describing the global cell numbering
@@ -266,4 +268,95 @@ def closure_ordering(PETSc.DM swarm,
 
     return cell_closure
 
-get_cell_nodes = dmplex.get_cell_nodes
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_cell_nodes(mesh,
+                   PETSc.Section global_numbering,
+                   entity_dofs,
+                   np.ndarray[PetscInt, ndim=1, mode="c"] offset):
+    """
+    Builds the DoF mapping.
+
+    Note that this is a copy and paste job from the equivalent function
+    in dmplex.pyx with the relevant modifications made for a DMSwarm.
+
+    :arg mesh: The mesh
+    :arg global_numbering: Section describing the global DoF numbering
+    :arg entity_dofs: FInAT element entity dofs for the cell
+    :arg offset: offsets for each entity dof walking up a column.
+
+    Preconditions: This function assumes that cell_closures contains mesh
+    entities ordered by dimension, i.e. vertices first, then edges, faces, and
+    finally the cell. For quadrilateral meshes, edges corresponding to
+    dimension (0, 1) in the FInAT element must precede edges corresponding to
+    dimension (1, 0) in the FInAT element.
+    """
+    cdef:
+        int *ceil_ndofs = NULL
+        int *flat_index = NULL
+        PetscInt nclosure, dofs_per_cell
+        PetscInt c, i, j, k, cStart, cEnd, cell
+        PetscInt entity, ndofs, off
+        PETSc.Section cell_numbering
+        np.ndarray[PetscInt, ndim=2, mode="c"] cell_nodes
+        np.ndarray[PetscInt, ndim=2, mode="c"] layer_extents
+        np.ndarray[PetscInt, ndim=2, mode="c"] cell_closures
+        bint variable
+
+    variable = mesh.variable_layers
+    cell_closures = mesh.cell_closure
+    if variable:
+        layer_extents = mesh.layer_extents
+        if offset is None:
+            raise ValueError("Offset cannot be None with variable layer extents")
+
+    nclosure = cell_closures.shape[1]
+
+    # Extract ordering from FInAT element entity DoFs
+    ndofs_list = []
+    flat_index_list = []
+
+    for dim in sorted(entity_dofs.keys()):
+        for entity_num in xrange(len(entity_dofs[dim])):
+            dofs = entity_dofs[dim][entity_num]
+
+            ndofs_list.append(len(dofs))
+            flat_index_list.extend(dofs)
+
+    # Coerce lists into C arrays
+    assert nclosure == len(ndofs_list)
+    dofs_per_cell = len(flat_index_list)
+
+    CHKERR(PetscMalloc1(nclosure, &ceil_ndofs))
+    CHKERR(PetscMalloc1(dofs_per_cell, &flat_index))
+
+    for i in range(nclosure):
+        ceil_ndofs[i] = ndofs_list[i]
+    for i in range(dofs_per_cell):
+        flat_index[i] = flat_index_list[i]
+
+    # Fill cell nodes
+    cStart = 0
+    cEnd = mesh._swarm.getSize()
+    cell_nodes = np.empty((cEnd - cStart, dofs_per_cell), dtype=IntType)
+    cell_numbering = mesh._cell_numbering
+    for c in range(cStart, cEnd):
+        k = 0
+        CHKERR(PetscSectionGetOffset(cell_numbering.sec, c, &cell))
+        for i in range(nclosure):
+            entity = cell_closures[cell, i]
+            CHKERR(PetscSectionGetDof(global_numbering.sec, entity, &ndofs))
+            if ndofs > 0:
+                CHKERR(PetscSectionGetOffset(global_numbering.sec, entity, &off))
+                # The cell we're looking at the entity through is
+                # higher than the lowest cell the column touches, so
+                # we need to offset by the difference from the bottom.
+                if variable:
+                    off += offset[flat_index[k]]*(layer_extents[c, 0] - layer_extents[entity, 0])
+                for j in range(ceil_ndofs[i]):
+                    cell_nodes[cell, flat_index[k]] = off + j
+                    k += 1
+
+    CHKERR(PetscFree(ceil_ndofs))
+    CHKERR(PetscFree(flat_index))
+    return cell_nodes
