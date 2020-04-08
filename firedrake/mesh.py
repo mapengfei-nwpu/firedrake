@@ -1086,33 +1086,32 @@ class VertexOnlyMeshTopology(MeshTopology):
 
     ## BEGIN TODO
 
-    # NOTE: cell_closure has already been partly modified.
-    # @property
-    # def cell_closure(self):
-    #     """2D array of ordered cell closures
+    @property
+    def cell_closure(self):
+        """2D array of ordered cell closures
 
-    #     Each row contains ordered cell entities for a cell, one row per cell.
-    #     """
-    #     swarm = self._swarm
-    #     dim = 0
+        Each row contains ordered cell entities for a cell, one row per cell.
+        """
+        swarm = self._swarm
+        dim = 0
 
-    #     # Cell numbering and global vertex numbering
-    #     cell_numbering = self._cell_numbering
-    #     vertex_numbering = self._vertex_numbering.createGlobalSection(swarm.getPointSF())
+        # Cell numbering and global vertex numbering
+        cell_numbering = self._cell_numbering
+        vertex_numbering = self._vertex_numbering.createGlobalSection(swarm.getPointSF())
 
-    #     cell = self.ufl_cell()
-    #     assert dim == cell.topological_dimension()
-    #     if cell.is_simplex():
-    #         import FIAT
-    #         topology = FIAT.ufc_cell(cell).get_topology()
-    #         entity_per_cell = np.zeros(len(topology), dtype=IntType)
-    #         for d, ents in topology.items():
-    #             entity_per_cell[d] = len(ents)
+        cell = self.ufl_cell()
+        assert dim == cell.topological_dimension()
+        if cell.is_simplex():
+            import FIAT
+            topology = FIAT.ufc_cell(cell).get_topology()
+            entity_per_cell = np.zeros(len(topology), dtype=IntType)
+            for d, ents in topology.items():
+                entity_per_cell[d] = len(ents)
 
-    #         return dmswarm.closure_ordering(swarm, vertex_numbering,
-    #                                         cell_numbering, entity_per_cell)
-    #     else:
-    #         raise NotImplementedError("Cell type '%s' not supported." % cell)
+            return dmswarm.closure_ordering(swarm, vertex_numbering,
+                                            cell_numbering, entity_per_cell)
+        else:
+            raise NotImplementedError("Cell type '%s' not supported." % cell)
 
     def _facets(self, kind):
         return None

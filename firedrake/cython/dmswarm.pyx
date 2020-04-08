@@ -190,176 +190,80 @@ def create_section(mesh, nodes_per_entity, on_base=False):
     section.setUp()
     return section
 
-# TODO Complete below
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# def closure_ordering(PETSc.DM plex,
-#                      PETSc.Section vertex_numbering,
-#                      PETSc.Section cell_numbering,
-#                      np.ndarray[PetscInt, ndim=1, mode="c"] entity_per_cell):
-#     """Apply Fenics local numbering to a cell closure.
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def closure_ordering(PETSc.DM swarm,
+                     PETSc.Section vertex_numbering,
+                     PETSc.Section cell_numbering,
+                     np.ndarray[PetscInt, ndim=1, mode="c"] entity_per_cell):
+    """Apply Fenics local numbering to a cell closure.
 
-#     :arg plex: The DMSwarm object encapsulating the vertex-only mesh topology
-#     :arg vertex_numbering: Section describing the universal vertex numbering
-#     :arg cell_numbering: Section describing the global cell numbering
-#     :arg entity_per_cell: List of the number of entity points in each dimension
+    :arg swarm: The DMSwarm object encapsulating the vertex-only mesh topology
+    :arg vertex_numbering: Section describing the universal vertex numbering
+    :arg cell_numbering: Section describing the global cell numbering
+    :arg entity_per_cell: List of the number of entity points in each dimension
 
-#     Vertices    := Ordered according to global/universal
-#                    vertex numbering
-#     Edges/faces := Ordered according to lexicographical
-#                    ordering of non-incident vertices
-#     """
-#     cdef:
-#         PetscInt c, cStart, cEnd, v, vStart, vEnd
-#         PetscInt f, fStart, fEnd, e, eStart, eEnd
-#         PetscInt dim, vi, ci, fi, v_per_cell, cell
-#         PetscInt offset, cell_offset, nfaces, nfacets
-#         PetscInt nclosure, nfacet_closure, nface_vertices
-#         PetscInt *vertices = NULL
-#         PetscInt *v_global = NULL
-#         PetscInt *closure = NULL
-#         PetscInt *facets = NULL
-#         PetscInt *faces = NULL
-#         PetscInt *face_indices = NULL
-#         const PetscInt *face_vertices = NULL
-#         PetscInt *facet_vertices = NULL
-#         np.ndarray[PetscInt, ndim=2, mode="c"] cell_closure
+    Vertices    := Ordered according to global/universal
+                   vertex numbering
+    Edges/faces := Ordered according to lexicographical
+                   ordering of non-incident vertices
+    """
+    cdef:
+        PetscInt c, cStart, cEnd, v, vStart, vEnd
+        PetscInt f, fStart, fEnd, e, eStart, eEnd
+        PetscInt dim, vi, ci, fi, v_per_cell, cell
+        PetscInt offset, cell_offset, nfaces, nfacets
+        PetscInt *vertices = NULL
+        PetscInt *v_global = NULL
+        PetscInt closure
+        PetscInt *facets = NULL
+        PetscInt *faces = NULL
+        PetscInt *face_indices = NULL
+        const PetscInt *face_vertices = NULL
+        PetscInt *facet_vertices = NULL
+        np.ndarray[PetscInt, ndim=2, mode="c"] cell_closure
 
-#     dim = plex.getDimension()
-#     cStart, cEnd = plex.getHeightStratum(0)
-#     fStart, fEnd = plex.getHeightStratum(1)
-#     eStart, eEnd = plex.getDepthStratum(1)
-#     vStart, vEnd = plex.getDepthStratum(0)
-#     v_per_cell = entity_per_cell[0]
-#     cell_offset = sum(entity_per_cell) - 1
+    dim = 0 # by definition since point cloud
+    cStart = 0
+    cEnd = swarm.getSize()
+    vStart = cStart
+    vEnd = cEnd
+    v_per_cell = entity_per_cell[0]
+    cell_offset = sum(entity_per_cell) - 1
 
-#     CHKERR(PetscMalloc1(v_per_cell, &vertices))
-#     CHKERR(PetscMalloc1(v_per_cell, &v_global))
-#     CHKERR(PetscMalloc1(v_per_cell, &facets))
-#     CHKERR(PetscMalloc1(v_per_cell-1, &facet_vertices))
-#     CHKERR(PetscMalloc1(entity_per_cell[1], &faces))
-#     CHKERR(PetscMalloc1(entity_per_cell[1], &face_indices))
-#     cell_closure = np.empty((cEnd - cStart, sum(entity_per_cell)), dtype=IntType)
+    CHKERR(PetscMalloc1(v_per_cell, &vertices))
+    CHKERR(PetscMalloc1(v_per_cell, &v_global))
+    cell_closure = np.empty((cEnd - cStart, sum(entity_per_cell)), dtype=IntType)
 
-#     for c in range(cStart, cEnd):
-#         CHKERR(PetscSectionGetOffset(cell_numbering.sec, c, &cell))
-#         CHKERR(DMPlexGetTransitiveClosure(plex.dm, c, PETSC_TRUE,
-#                                           &nclosure,&closure))
+    for c in range(cStart, cEnd):
+        CHKERR(PetscSectionGetOffset(cell_numbering.sec, c, &cell))
+        closure = c # by definition since just the vertex
 
-#         # Find vertices and translate universal numbers
-#         vi = 0
-#         for ci in range(nclosure):
-#             if vStart <= closure[2*ci] < vEnd:
-#                 vertices[vi] = closure[2*ci]
-#                 CHKERR(PetscSectionGetOffset(vertex_numbering.sec,
-#                                              closure[2*ci], &v))
-#                 # Correct -ve offsets for non-owned entities
-#                 if v >= 0:
-#                     v_global[vi] = v
-#                 else:
-#                     v_global[vi] = -(v+1)
-#                 vi += 1
+        # Find vertices and translate universal numbers
+        vi = 0
+        if vStart <= closure < vEnd:
+            vertices[vi] = closure
+            CHKERR(PetscSectionGetOffset(vertex_numbering.sec,
+                                            closure, &v))
+            # Correct -ve offsets for non-owned entities
+            if v >= 0:
+                v_global[vi] = v
+            else:
+                v_global[vi] = -(v+1)
+            vi += 1
 
-#         # Sort vertices by universal number
-#         CHKERR(PetscSortIntWithArray(v_per_cell,v_global,vertices))
-#         for vi in range(v_per_cell):
-#             if dim == 1:
-#                 # Correct 1D edge numbering
-#                 cell_closure[cell, vi] = vertices[v_per_cell-vi-1]
-#             else:
-#                 cell_closure[cell, vi] = vertices[vi]
-#         offset = v_per_cell
+        # Sort vertices by universal number
+        CHKERR(PetscSortIntWithArray(v_per_cell,v_global,vertices))
+        for vi in range(v_per_cell):
+            cell_closure[cell, vi] = vertices[vi]
+        offset = v_per_cell
 
-#         # Find all edges (dim=1)
-#         if dim > 2:
-#             nfaces = 0
-#             for ci in range(nclosure):
-#                 if eStart <= closure[2*ci] < eEnd:
-#                     faces[nfaces] = closure[2*ci]
+        # The cell itself is always the first entry in the Swarm closure
+        cell_closure[cell, cell_offset] = closure
 
-#                     CHKERR(DMPlexGetConeSize(plex.dm, closure[2*ci],
-#                                              &nface_vertices))
-#                     CHKERR(DMPlexGetCone(plex.dm, closure[2*ci],
-#                                          &face_vertices))
+    CHKERR(PetscFree(vertices))
+    CHKERR(PetscFree(v_global))
 
-#                     # Edges in 3D are tricky because we need a
-#                     # lexicographical sort with two keys (the local
-#                     # numbers of the two non-incident vertices).
-
-#                     # Find non-incident vertices
-#                     fi = 0
-#                     face_indices[nfaces] = 0
-#                     for v in range(v_per_cell):
-#                         incident = 0
-#                         for vi in range(nface_vertices):
-#                             if cell_closure[cell,v] == face_vertices[vi]:
-#                                 incident = 1
-#                                 break
-#                         if incident == 0:
-#                             face_indices[nfaces] += v * 10**(1-fi)
-#                             fi += 1
-#                     nfaces += 1
-
-#             # Sort by local numbers of non-incident vertices
-#             CHKERR(PetscSortIntWithArray(entity_per_cell[1],
-#                                          face_indices, faces))
-#             for fi in range(nfaces):
-#                 cell_closure[cell, offset+fi] = faces[fi]
-#             offset += nfaces
-
-#         # Calling DMPlexGetTransitiveClosure() again invalidates the
-#         # current work array, so we need to get the facets and cell
-#         # out before getting the facet closures.
-
-#         # Find all facets (co-dim=1)
-#         nfacets = 0
-#         for ci in range(nclosure):
-#             if fStart <= closure[2*ci] < fEnd:
-#                 facets[nfacets] = closure[2*ci]
-#                 nfacets += 1
-
-#         # The cell itself is always the first entry in the Plex closure
-#         cell_closure[cell, cell_offset] = closure[0]
-
-#         # Now we can deal with facets
-#         if dim > 1:
-#             for f in range(nfacets):
-#                 # Derive facet vertices from facet_closure
-#                 CHKERR(DMPlexGetTransitiveClosure(plex.dm, facets[f],
-#                                                   PETSC_TRUE,
-#                                                   &nfacet_closure,
-#                                                   &closure))
-#                 vi = 0
-#                 for fi in range(nfacet_closure):
-#                     if vStart <= closure[2*fi] < vEnd:
-#                         facet_vertices[vi] = closure[2*fi]
-#                         vi += 1
-
-#                 # Find non-incident vertices
-#                 for v in range(v_per_cell):
-#                     incident = 0
-#                     for vi in range(v_per_cell-1):
-#                         if cell_closure[cell,v] == facet_vertices[vi]:
-#                             incident = 1
-#                             break
-#                     # Only one non-incident vertex per facet, so
-#                     # local facet no. = non-incident vertex no.
-#                     if incident == 0:
-#                         cell_closure[cell,offset+v] = facets[f]
-#                         break
-
-#             offset += nfacets
-
-#     if closure != NULL:
-#         CHKERR(DMPlexRestoreTransitiveClosure(plex.dm, 0, PETSC_TRUE,
-#                                               NULL, &closure))
-#     CHKERR(PetscFree(vertices))
-#     CHKERR(PetscFree(v_global))
-#     CHKERR(PetscFree(facets))
-#     CHKERR(PetscFree(facet_vertices))
-#     CHKERR(PetscFree(faces))
-#     CHKERR(PetscFree(face_indices))
-
-#     return cell_closure
+    return cell_closure
 
 get_cell_nodes = dmplex.get_cell_nodes
