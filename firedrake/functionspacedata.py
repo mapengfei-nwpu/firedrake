@@ -172,10 +172,16 @@ def get_map_cache(mesh, key):
         real_tensorproduct is True if the function space is a degenerate
         fs x Real tensorproduct.
     """
-    return {mesh.cell_set: None,
-            mesh.interior_facets.set: None,
-            mesh.exterior_facets.set: None,
-            "boundary_node": None}
+    if type(mesh.topology) is mesh_mod.VertexOnlyMeshTopology:
+        return {mesh.cell_set: None,
+                None: None,
+                None: None,
+                "boundary_node": None}
+    else:
+        return {mesh.cell_set: None,
+                mesh.interior_facets.set: None,
+                mesh.exterior_facets.set: None,
+                "boundary_node": None}
 
 
 @cached
