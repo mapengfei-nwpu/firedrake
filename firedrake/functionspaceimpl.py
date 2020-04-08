@@ -364,11 +364,17 @@ class FunctionSpace(object):
 
     def _dm(self):
         from firedrake.mg.utils import get_level
+        from firedrake.mesh import VertexOnlyMeshTopology
         dm = self.dof_dset.dm
         _, level = get_level(self.mesh())
-        dmhooks.attach_hooks(dm, level=level,
-                             sf=self.mesh()._plex.getPointSF(),
-                             section=self._shared_data.global_numbering)
+        if type(self.mesh().topology) is VertexOnlyMeshTopology:
+            dmhooks.attach_hooks(dm, level=level,
+                                 sf=self.mesh()._swarm.getPointSF(),
+                                 section=self._shared_data.global_numbering)
+        else:
+            dmhooks.attach_hooks(dm, level=level,
+                                 sf=self.mesh()._plex.getPointSF(),
+                                 section=self._shared_data.global_numbering)
         # Remember the function space so we can get from DM back to FunctionSpace.
         dmhooks.set_function_space(dm, self)
         return dm
@@ -854,11 +860,17 @@ class RealFunctionSpace(FunctionSpace):
 
     def _dm(self):
         from firedrake.mg.utils import get_level
+        from firedrake.mesh import VertexOnlyMeshTopology
         dm = self.dof_dset.dm
         _, level = get_level(self.mesh())
-        dmhooks.attach_hooks(dm, level=level,
-                             sf=self.mesh()._plex.getPointSF(),
-                             section=None)
+        if type(self.mesh().topology) is VertexOnlyMeshTopology:
+            dmhooks.attach_hooks(dm, level=level,
+                                 sf=self.mesh()._swarm.getPointSF(),
+                                 section=None)
+        else:
+            dmhooks.attach_hooks(dm, level=level,
+                                 sf=self.mesh()._plex.getPointSF(),
+                                 section=None)
         # Remember the function space so we can get from DM back to FunctionSpace.
         dmhooks.set_function_space(dm, self)
         return dm
