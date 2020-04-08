@@ -360,3 +360,34 @@ def get_cell_nodes(mesh,
     CHKERR(PetscFree(ceil_ndofs))
     CHKERR(PetscFree(flat_index))
     return cell_nodes
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def reordered_coords(PETSc.DM swarm, PETSc.Section global_numbering, shape):
+    """Return coordinates for the swarm, reordered according to the
+    global numbering permutation for the coordinate function space.
+
+    Note that this is a copy and paste job from the equivalent function
+    in dmplex.pyx with the relevant modifications made for a DMSwarm.
+
+    Shape is a tuple of (mesh.num_vertices(), geometric_dim)."""
+    cdef:
+        PetscInt v, vStart, vEnd, offset
+        PetscInt i, dim = shape[1]
+        np.ndarray[PetscReal, ndim=2, mode="c"] swarm_coords, coords
+
+    # get coords field - NOTE it isn't copied so could have GC issues!
+    swarm_coords = swarm.getField("DMSwarmPIC_coor").reshape(shape)
+    coords = np.empty_like(swarm_coords)
+    vStart = 0
+    vEnd = swarm.getLocalSize()
+
+    for v in range(vStart, vEnd):
+        CHKERR(PetscSectionGetOffset(global_numbering.sec, v, &offset))
+        for i in range(dim):
+            coords[offset, i] = swarm_coords[v - vStart, i]
+
+    # have to restore coords field once accessed to allow access again
+    swarm.restoreField("DMSwarmPIC_coor")
+
+    return coords

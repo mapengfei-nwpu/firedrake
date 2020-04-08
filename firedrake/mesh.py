@@ -1863,7 +1863,7 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
         coordinates_fs = functionspace.VectorFunctionSpace(self.topology, "DG", 0,
                                                            dim=gdim)
 
-        coordinates_data = dmplex.reordered_coords(plex, coordinates_fs.dm.getDefaultSection(),
+        coordinates_data = dmswarm.reordered_coords(swarm, coordinates_fs.dm.getDefaultSection(),
                                                    (self.num_vertices(), gdim))
 
         coordinates = function.CoordinatelessFunction(coordinates_fs,
