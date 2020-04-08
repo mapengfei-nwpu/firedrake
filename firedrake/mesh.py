@@ -1197,15 +1197,15 @@ class VertexOnlyMeshTopology(MeshTopology):
     #     """
     #     return tuple(np.dot(nodes_per_entity, self._entity_classes))
 
-    # def make_cell_node_list(self, global_numbering, entity_dofs, offsets):
-    #     """Builds the DoF mapping.
+    def make_cell_node_list(self, global_numbering, entity_dofs, offsets):
+        """Builds the DoF mapping.
 
-    #     :arg global_numbering: Section describing the global DoF numbering
-    #     :arg entity_dofs: FInAT element entity DoFs
-    #     :arg offsets: layer offsets for each entity dof (may be None).
-    #     """
-    #     return dmplex.get_cell_nodes(self, global_numbering,
-    #                                  entity_dofs, offsets)
+        :arg global_numbering: Section describing the global DoF numbering
+        :arg entity_dofs: FInAT element entity DoFs
+        :arg offsets: layer offsets for each entity dof (may be None).
+        """
+        return dmswarm.get_cell_nodes(self, global_numbering,
+                                      entity_dofs, offsets)
 
     # def make_dofs_per_plex_entity(self, entity_dofs):
     #     """Returns the number of DoFs per plex entity for each stratum,

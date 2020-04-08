@@ -8,10 +8,10 @@ from mpi4py import MPI
 from pyop2.datatypes import IntType
 from libc.string cimport memset
 from libc.stdlib cimport qsort
-
 cimport numpy as np
 cimport mpi4py.MPI as MPI
 cimport petsc4py.PETSc as PETSc
+import firedrake.cython.dmplex as dmplex
 
 np.import_array()
 
@@ -361,3 +361,5 @@ def create_section(mesh, nodes_per_entity, on_base=False):
 #     CHKERR(PetscFree(face_indices))
 
 #     return cell_closure
+
+get_cell_nodes = dmplex.get_cell_nodes
