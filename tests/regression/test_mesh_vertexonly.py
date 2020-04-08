@@ -112,9 +112,5 @@ def test_generate():
 
 # remove this before final merge
 if __name__ == "__main__":
-    # m = UnitSquareMesh(1,1)
-    # vertexcoords = cell_midpoints(m)
-    # vm = VertexOnlyMesh(m, vertexcoords)
-    # verify_vertexonly_mesh(m, vm)
     import pytest, sys
     pytest.main([sys.argv[0]])
