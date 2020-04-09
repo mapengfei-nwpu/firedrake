@@ -86,10 +86,31 @@ def test_pic_swarm_in_plex_3d():
     m = UnitCubeMesh(1,1,1)
     _test_pic_swarm_in_plex(m)
 
-def verify_vertexonly_mesh(m, vm):
+def verify_vertexonly_mesh(m, vm, gdim):
     # test that the mesh properties are as expected
+    # Can initialise
     vm.init()
+    # Check properties
     #TODO
+    # Can create function spaces
+    V = FunctionSpace(vm, "DG", 0)
+    # Can't create function space other than DG0
+    #TODO
+    # Can create function on function spaces
+    f = Function(V)
+    # Can interpolate onto functions
+    if gdim == 1:
+        x = SpatialCoordinate(vm)
+        f.interpolate(x)
+    elif gdim == 2:
+        x, y = SpatialCoordinate(vm)
+        f.interpolate(x+y)
+    elif gdim == 3:
+        x, y, z = SpatialCoordinate(vm)
+        f.interpolate(x+y+z)
+    # Get exact values at coordinates
+    for coord in vm.coordinates.dat.data_ro:
+        f.at(coord) == sum(coord)
 
 def test_generate():
 
@@ -98,19 +119,22 @@ def test_generate():
         m = UnitIntervalMesh(1)
         vertexcoords = cell_midpoints(m)
         vm = VertexOnlyMesh(m, vertexcoords)
-        verify_vertexonly_mesh(m, vm)
+        verify_vertexonly_mesh(m, vm, 1)
 
     m = UnitSquareMesh(1,1)
     vertexcoords = cell_midpoints(m)
     vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm)
+    verify_vertexonly_mesh(m, vm, 2)
+
 
     m = UnitCubeMesh(1,1,1)
     vertexcoords = cell_midpoints(m)
     vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm)
+    verify_vertexonly_mesh(m, vm, 3)
 
 # remove this before final merge
 if __name__ == "__main__":
+    # f = Function(V).interpolate(m.coordinates)
+    test_generate()
     import pytest, sys
     pytest.main([sys.argv[0]])
