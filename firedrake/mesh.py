@@ -1054,9 +1054,10 @@ class VertexOnlyMeshTopology(MeshTopology):
         # Cell subsets for integration over subregions
         self._subsets = {}
 
-        dim = 0
+        tdim = 0
+        gdim = swarm.getCoordinateDim()
 
-        self._ufl_cell = ufl.Cell("vertex")
+        self._ufl_cell = ufl.Cell("vertex", geometric_dimension=gdim)
 
         # A set of weakrefs to meshes that are explicitly labelled as being
         # parallel-compatible for interpolation/projection/supermeshing
@@ -1074,7 +1075,7 @@ class VertexOnlyMeshTopology(MeshTopology):
                 self._entity_classes = dmswarm.get_entity_classes(self._swarm).astype(int)
 
                 # Derive a cell numbering from the Swarm numbering
-                entity_dofs = np.zeros(dim+1, dtype=IntType)
+                entity_dofs = np.zeros(tdim+1, dtype=IntType)
                 entity_dofs[-1] = 1
 
                 self._cell_numbering = self.create_section(entity_dofs)
@@ -1093,14 +1094,14 @@ class VertexOnlyMeshTopology(MeshTopology):
         Each row contains ordered cell entities for a cell, one row per cell.
         """
         swarm = self._swarm
-        dim = 0
+        tdim = 0
 
         # Cell numbering and global vertex numbering
         cell_numbering = self._cell_numbering
         vertex_numbering = self._vertex_numbering.createGlobalSection(swarm.getPointSF())
 
         cell = self.ufl_cell()
-        assert dim == cell.topological_dimension()
+        assert tdim == cell.topological_dimension()
         if cell.is_simplex():
             import FIAT
             topology = FIAT.ufc_cell(cell).get_topology()
