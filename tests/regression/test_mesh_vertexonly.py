@@ -57,18 +57,45 @@ def _test_pic_swarm_in_plex(m):
     assert nptsglobal == swarm.getSize()
     # Check each cell has the correct point associated with it
     #TODO
+    return swarm
+
+def _test_pic_swarm_remove_ghost_cell_coords(m, swarm):
+    """Test that _test_pic_swarm_remove_ghost_cell_coords removes
+    coordinates from ghost cells correctly."""
+    mesh._pic_swarm_remove_ghost_cell_coords(m, swarm)
+    # Get point coords on current MPI rank
+    localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
+    swarm.restoreField("DMSwarmPIC_coor")
+    if len(pointcoords.shape) > 1:
+        localpointcoords = np.reshape(localpointcoords, (-1, pointcoords.shape[1]))
+    # check local points are found in list of points
+    for p in localpointcoords:
+        assert np.any(np.isclose(p, pointcoords))
+    # Check methods for checking number of points on current MPI rank
+    assert len(localpointcoords) == swarm.getLocalSize()
+    # Check there are as many local points as there are local cells
+    # (excluding ghost cells in the halo)
+    assert len(localpointcoords) == m.cell_set.size
+    # Check total number of points on all MPI ranks is correct
+    # (excluding ghost cells in the halo)
+    nptslocal = len(localpointcoords)
+    nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
+    assert nptsglobal == len(pointcoords)
+    assert nptsglobal == swarm.getSize()
 
 # 1D case not implemented yet
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_1d():
     with pytest.raises(NotImplementedError):
         m = UnitIntervalMesh(1)
-        _test_pic_swarm_in_plex(m)
+        swarm = _test_pic_swarm_in_plex(m)
+        _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
 
 # Need to test cases with 2 cells across 1, 2 and 3 processors
 def _test_pic_swarm_in_plex_2d():
     m = UnitSquareMesh(1,1)
-    _test_pic_swarm_in_plex(m)
+    swarm = _test_pic_swarm_in_plex(m)
+    _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
 
 def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
     _test_pic_swarm_in_plex_2d()
@@ -84,7 +111,8 @@ def test_pic_swarm_in_plex_2d_3procs():
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_3d():
     m = UnitCubeMesh(1,1,1)
-    _test_pic_swarm_in_plex(m)
+    swarm = _test_pic_swarm_in_plex(m)
+    _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
 
 def verify_vertexonly_mesh(m, vm, gdim):
     # test that the mesh properties are as expected
