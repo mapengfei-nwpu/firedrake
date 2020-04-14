@@ -45,13 +45,15 @@ def _test_pic_swarm_in_plex(m):
     # Check methods for checking number of points on current MPI rank
     assert len(localpointcoords) == swarm.getLocalSize()
     # Check there are as many local points as there are local cells
-    # (excluding ghost cells in the halo)
-    assert len(localpointcoords) == m.num_cells() == m.cell_set.size
+    # (including ghost cells in the halo)
+    assert len(localpointcoords) == m.num_cells() == m.cell_set.total_size
     # Check total number of points on all MPI ranks is correct
     # (excluding ghost cells in the halo)
+    nghostcellslocal = m.cell_set.total_size - m.cell_set.size
+    nghostcellsglobal = MPI.COMM_WORLD.allreduce(nghostcellslocal, op=MPI.SUM)
     nptslocal = len(localpointcoords)
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
-    assert nptsglobal == len(pointcoords)
+    assert nptsglobal-nghostcellsglobal == len(pointcoords)
     assert nptsglobal == swarm.getSize()
     # Check each cell has the correct point associated with it
     #TODO
@@ -132,5 +134,7 @@ def test_generate():
 
 # remove this before final merge
 if __name__ == "__main__":
+    # f = Function(V).interpolate(m.coordinates)
+    test_generate()
     import pytest, sys
     pytest.main([sys.argv[0]])
