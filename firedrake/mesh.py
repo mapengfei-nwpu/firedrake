@@ -1083,6 +1083,9 @@ class VertexOnlyMeshTopology(MeshTopology):
                 entity_dofs[0] = 1
                 self._vertex_numbering = self.create_section(entity_dofs)
 
+                if swarm.comm.size > 1:
+                    _pic_swarm_remove_ghost_cell_coords(self, self._swarm)
+
         self._callback = callback
 
     ## BEGIN TODO
@@ -1844,8 +1847,6 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
         raise NotImplementedError("Only straight edged meshes are supported")
 
     swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
-    if swarm.comm.size > 1:
-        _pic_swarm_remove_ghost_cell_coords(mesh, swarm)
 
     # Topology
     topology = VertexOnlyMeshTopology(swarm, mesh.topology, name="swarmmesh", reorder=False)
@@ -1967,7 +1968,9 @@ def _pic_swarm_remove_ghost_cell_coords(parentmesh, dmswarm):
     immersed in `parentmesh` which are located in the ghost cells of
     `parentmesh`.
     """
-    raise NotImplementedError("Removal of DMSwarm Coordinates from Ghost cells still WIP")
+    point_sf = dmswarm.getPointSF()
+    nroots, local, remote = point_sf.getGraph()
+    print(f"Rank {dmswarm.comm.rank} has nroots {nroots}, local {local}, remote {remote}")
 
 def SubDomainData(geometric_expr):
     """Creates a subdomain data object from a boolean-valued UFL expression.
