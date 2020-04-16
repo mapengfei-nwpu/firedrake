@@ -3,6 +3,8 @@ import pytest
 import numpy as np
 from mpi4py import MPI
 
+# Utility Functions
+
 def cell_midpoints(m):
     """Get the coordinates of the midpoints of every cell in mesh `m`.
     The mesh may be distributed, but the midpoints are returned for the
@@ -24,6 +26,8 @@ def cell_midpoints(m):
     MPI.COMM_WORLD.Allgatherv(local_midpoints, (midpoints, local_midpoints_sizes))
     assert len(np.unique(midpoints, axis=0)) == len(midpoints)
     return midpoints
+
+# pic swarm tests
 
 def _test_pic_swarm_in_plex(m):
     """Generate points in cell midpoints of mesh `m` and check correct
@@ -126,6 +130,8 @@ def test_pic_swarm_remove_ghost_cell_coords_2d():
 def test_pic_swarm_remove_ghost_cell_coords_3d():
     _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1,1))
 
+# Mesh Generation Tests
+
 def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
     assert m.geometric_dimension() == gdim
     # Correct dims
@@ -136,13 +142,48 @@ def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
     # Correct coordinates
     assert np.shape(vm.coordinates.dat.data_ro) == np.shape(vertexcoords)
     assert np.all(np.isin(vm.coordinates.dat.data_ro, vertexcoords))
-    # Can create function spaces
-    V = FunctionSpace(vm, "DG", 0)
-    # Can't create function space other than DG0
-    #TODO
+    # Correct parent topology
+    assert vm._parent_mesh is m.topology
+
+def _test_generate(m):
+    vertexcoords = cell_midpoints(m)
+    vm = VertexOnlyMesh(m, vertexcoords)
+    verify_vertexonly_mesh(m, vm, vertexcoords, m.geometric_dimension())
+
+@pytest.mark.xfail
+def test_generate_1d():
+    _test_generate(UnitIntervalMesh(1))
+
+def test_generate_2d():
+    _test_generate(UnitSquareMesh(1,1))
+
+def test_generate_3d():
+    _test_generate(UnitCubeMesh(1,1,1))
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=2)
+def test_generate_1d_2procs():
+    test_generate_1d()
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=2)
+def test_generate_2d_2procs():
+    test_generate_2d()
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=2)
+def test_generate_3d_2procs():
+    test_generate_3d()
+
+# Mesh use tests
+
+def _test_functionspace(vm, family, degree):
+    # Can create function space
+    V = FunctionSpace(vm, family, degree)
     # Can create function on function spaces
     f = Function(V)
     # Can interpolate onto functions
+    gdim = vm.geometric_dimension()
     if gdim == 1:
         x, = SpatialCoordinate(vm)
         f.interpolate(x)
@@ -159,20 +200,26 @@ def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
         # assert f.at(coord) == sum(coord)
         assert np.isin(sum(coord), f.dat.data_ro)
 
-def _test_generate(m):
-    vertexcoords = cell_midpoints(m)
-    vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm, vertexcoords, m.geometric_dimension())
-
-@pytest.mark.xfail
-def test_generate_1d():
-    _test_generate(UnitIntervalMesh(1))
-
-def test_generate_2d():
-    _test_generate(UnitSquareMesh(1,1))
-
-def test_generate_3d():
-    _test_generate(UnitCubeMesh(1,1,1))
+@pytest.mark.parametrize(
+    "parentmesh",
+    [
+        pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(reason="not implemented in 1d")),
+        UnitSquareMesh(1,1),
+        UnitCubeMesh(1,1,1)
+    ],
+)
+@pytest.mark.parametrize(
+    ("family", "degree"),
+    [
+        ("DG", 0),
+        pytest.param("DG", 1, marks=pytest.mark.xfail(reason="unsupported degree")),
+        pytest.param("CG", 1, marks=pytest.mark.xfail(reason="unsupported family and degree"))
+    ],
+)
+def test_functionspace(parentmesh, family, degree):
+    vertexcoords = cell_midpoints(parentmesh)
+    vm = VertexOnlyMesh(parentmesh, vertexcoords)
+    _test_functionspace(vm, family, degree)
 
 # remove this before final merge
 if __name__ == "__main__":
