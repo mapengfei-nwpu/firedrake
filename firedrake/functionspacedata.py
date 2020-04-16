@@ -154,10 +154,16 @@ def get_entity_node_lists(mesh, key, entity_dofs, global_numbering, offsets):
 
     class magic(dict):
         def __missing__(self, key):
-            return self.setdefault(key,
-                                   {mesh.cell_set: lambda: cell_node_list,
-                                    mesh.interior_facets.set: interior_facet_node_list,
-                                    mesh.exterior_facets.set: exterior_facet_node_list}[key]())
+            if type(mesh.topology) is mesh_mod.VertexOnlyMeshTopology:
+                return self.setdefault(key,
+                                       {mesh.cell_set: lambda: cell_node_list,
+                                        None: None,
+                                        None: None}[key]())
+            else:
+                return self.setdefault(key,
+                                       {mesh.cell_set: lambda: cell_node_list,
+                                        mesh.interior_facets.set: interior_facet_node_list,
+                                        mesh.exterior_facets.set: exterior_facet_node_list}[key]())
 
     return magic()
 
