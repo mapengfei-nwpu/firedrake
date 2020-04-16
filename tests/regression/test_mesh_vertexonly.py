@@ -29,7 +29,7 @@ def cell_midpoints(m):
 
 """Parent meshes used in tests"""
 parentmeshes = [
-    pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(raises=NotImplementedError, reason="swarm not implemented in 1d")),
+    pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(reason="swarm not implemented in 1d")),
     UnitSquareMesh(1,1),
     UnitCubeMesh(1,1,1)
 ]
@@ -72,7 +72,7 @@ def test_pic_swarm_in_plex(parentmesh):
     return swarm
 
 @pytest.mark.parallel
-@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.xfail(reason="not implemented in parallel")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 def test_pic_swarm_in_plex_parallel(parentmesh):
     test_pic_swarm_in_plex(parentmesh)
@@ -88,7 +88,7 @@ def test_pic_swarm_in_plex_2d_3procs():
     test_pic_swarm_in_plex(UnitSquareMesh(1,1))
 
 @pytest.mark.parallel
-@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented at all!")
+@pytest.mark.xfail(reason="not implemented at all!")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 def test_pic_swarm_remove_ghost_cell_coords(parentmesh):
     """Test that _test_pic_swarm_remove_ghost_cell_coords removes
@@ -140,7 +140,7 @@ def test_generate(parentmesh):
     verify_vertexonly_mesh(parentmesh, vm, vertexcoords, parentmesh.geometric_dimension())
 
 @pytest.mark.parallel(nprocs=2)
-@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.xfail(reason="not implemented in parallel")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 def test_generate_parallel(parentmesh):
     test_generate(parentmesh)
@@ -189,8 +189,8 @@ def _test_vectorfunctionspace(vm, family, degree):
 """Families and degrees to test function spaces on VertexOnlyMesh"""
 families_and_degrees = [
     ("DG", 0),
-    pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
-    pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
+    pytest.param("DG", 1, marks=pytest.mark.xfail(reason="unsupported degree")),
+    pytest.param("CG", 1, marks=pytest.mark.xfail(reason="unsupported family and degree"))
 ]
 
 @pytest.mark.parametrize("parentmesh", parentmeshes)
@@ -202,7 +202,7 @@ def test_functionspaces(parentmesh, family, degree):
     _test_vectorfunctionspace(vm, family, degree)
 
 @pytest.mark.parallel
-@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.xfail(reason="not implemented in parallel")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 @pytest.mark.parametrize(("family", "degree"), families_and_degrees)
 def test_functionspaces_parallel(parentmesh, family, degree):
