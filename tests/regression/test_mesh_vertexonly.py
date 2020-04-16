@@ -128,7 +128,7 @@ def verify_vertexonly_mesh(m, vm, gdim):
     f = Function(V)
     # Can interpolate onto functions
     if gdim == 1:
-        x = SpatialCoordinate(vm)
+        x, = SpatialCoordinate(vm)
         f.interpolate(x)
     elif gdim == 2:
         x, y = SpatialCoordinate(vm)
