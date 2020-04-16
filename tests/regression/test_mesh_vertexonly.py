@@ -212,11 +212,34 @@ def _test_functionspace(vm, family, degree):
     ("family", "degree"),
     [
         ("DG", 0),
-        pytest.param("DG", 1, marks=pytest.mark.xfail(reason="unsupported degree")),
-        pytest.param("CG", 1, marks=pytest.mark.xfail(reason="unsupported family and degree"))
+        pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
+        pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
     ],
 )
 def test_functionspace(parentmesh, family, degree):
+    vertexcoords = cell_midpoints(parentmesh)
+    vm = VertexOnlyMesh(parentmesh, vertexcoords)
+    _test_functionspace(vm, family, degree)
+
+@pytest.mark.parallel
+@pytest.mark.xfail(reason="not implemented in parallel")
+@pytest.mark.parametrize(
+    "parentmesh",
+    [
+        pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(reason="not implemented in 1d")),
+        UnitSquareMesh(1,1),
+        UnitCubeMesh(1,1,1)
+    ],
+)
+@pytest.mark.parametrize(
+    ("family", "degree"),
+    [
+        ("DG", 0),
+        pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
+        pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
+    ],
+)
+def test_functionspace_parallel(parentmesh, family, degree):
     vertexcoords = cell_midpoints(parentmesh)
     vm = VertexOnlyMesh(parentmesh, vertexcoords)
     _test_functionspace(vm, family, degree)
