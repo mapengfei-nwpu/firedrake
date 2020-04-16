@@ -59,6 +59,33 @@ def _test_pic_swarm_in_plex(m):
     #TODO
     return swarm
 
+# 1D case not implemented yet
+@pytest.mark.xfail
+def test_pic_swarm_in_plex_1d():
+    swarm = _test_pic_swarm_in_plex(UnitIntervalMesh(1))
+
+# Need to test cases with 2 cells across 1, 2 and 3 processors
+def _test_pic_swarm_in_plex_2d():
+    swarm = _test_pic_swarm_in_plex(UnitSquareMesh(1,1))
+
+def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
+    _test_pic_swarm_in_plex_2d()
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
+def test_pic_swarm_in_plex_2d_2procs():
+    _test_pic_swarm_in_plex_2d()
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
+def test_pic_swarm_in_plex_2d_3procs():
+    _test_pic_swarm_in_plex_2d()
+
+@pytest.mark.xfail
+@pytest.mark.parallel(nprocs=2)
+def test_pic_swarm_in_plex_3d():
+    swarm = _test_pic_swarm_in_plex(UnitCubeMesh(1,1,1))
+
 def _test_pic_swarm_remove_ghost_cell_coords(m):
     """Test that _test_pic_swarm_remove_ghost_cell_coords removes
     coordinates from ghost cells correctly."""
@@ -86,33 +113,6 @@ def _test_pic_swarm_remove_ghost_cell_coords(m):
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
     assert nptsglobal == len(pointcoords)
     assert nptsglobal == swarm.getSize()
-
-# 1D case not implemented yet
-@pytest.mark.xfail
-def test_pic_swarm_in_plex_1d():
-    swarm = _test_pic_swarm_in_plex(UnitIntervalMesh(1))
-
-# Need to test cases with 2 cells across 1, 2 and 3 processors
-def _test_pic_swarm_in_plex_2d():
-    swarm = _test_pic_swarm_in_plex(UnitSquareMesh(1,1))
-
-def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
-    _test_pic_swarm_in_plex_2d()
-
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
-def test_pic_swarm_in_plex_2d_2procs():
-    _test_pic_swarm_in_plex_2d()
-
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
-def test_pic_swarm_in_plex_2d_3procs():
-    _test_pic_swarm_in_plex_2d()
-
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=2)
-def test_pic_swarm_in_plex_3d():
-    swarm = _test_pic_swarm_in_plex(UnitCubeMesh(1,1,1))
 
 @pytest.mark.xfail
 def test_pic_swarm_remove_ghost_cell_coords_1d():
