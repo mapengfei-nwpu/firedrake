@@ -200,6 +200,22 @@ def _test_functionspace(vm, family, degree):
         # assert f.at(coord) == sum(coord)
         assert np.isin(sum(coord), f.dat.data_ro)
 
+def _test_vectorfunctionspace(vm, family, degree):
+    # Can create function space
+    V = VectorFunctionSpace(vm, family, degree)
+    # Can create function on function spaces
+    f = Function(V)
+    # Can interpolate onto functions
+    gdim = vm.geometric_dimension()
+    x = SpatialCoordinate(vm)
+    f.interpolate(2*as_vector(x))
+    # Get exact values at coordinates
+    assert np.shape(f.dat.data_ro)[0] == np.shape(vm.coordinates.dat.data_ro)[0]
+    for coord in vm.coordinates.dat.data_ro:
+        # .at doesn't work on immersed manifolds
+        # assert f.at(coord) == sum(coord)
+        assert np.all(np.isin(2*coord, f.dat.data_ro))
+
 @pytest.mark.parametrize(
     "parentmesh",
     [
@@ -216,10 +232,11 @@ def _test_functionspace(vm, family, degree):
         pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
     ],
 )
-def test_functionspace(parentmesh, family, degree):
+def test_functionspaces(parentmesh, family, degree):
     vertexcoords = cell_midpoints(parentmesh)
     vm = VertexOnlyMesh(parentmesh, vertexcoords)
     _test_functionspace(vm, family, degree)
+    _test_vectorfunctionspace(vm, family, degree)
 
 @pytest.mark.parallel
 @pytest.mark.xfail(reason="not implemented in parallel")
@@ -239,10 +256,8 @@ def test_functionspace(parentmesh, family, degree):
         pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
     ],
 )
-def test_functionspace_parallel(parentmesh, family, degree):
-    vertexcoords = cell_midpoints(parentmesh)
-    vm = VertexOnlyMesh(parentmesh, vertexcoords)
-    _test_functionspace(vm, family, degree)
+def test_functionspaces_parallel(parentmesh, family, degree):
+    test_functionspaces(parentmesh, family, degree)
 
 # remove this before final merge
 if __name__ == "__main__":
