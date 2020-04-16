@@ -27,14 +27,22 @@ def cell_midpoints(m):
     assert len(np.unique(midpoints, axis=0)) == len(midpoints)
     return midpoints
 
+"""Parent meshes used in tests"""
+parentmeshes = [
+    pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(raises=NotImplementedError, reason="swarm not implemented in 1d")),
+    UnitSquareMesh(1,1),
+    UnitCubeMesh(1,1,1)
+]
+
 # pic swarm tests
 
-def _test_pic_swarm_in_plex(m):
-    """Generate points in cell midpoints of mesh `m` and check correct
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_pic_swarm_in_plex(parentmesh):
+    """Generate points in cell midpoints of mesh `parentmesh` and check correct
     swarm is created in plex."""
-    m.init()
-    pointcoords = cell_midpoints(m)
-    plex = m.topology._plex
+    parentmesh.init()
+    pointcoords = cell_midpoints(parentmesh)
+    plex = parentmesh.topology._plex
     swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
     # Check comm sizes match
     assert plex.comm.size == swarm.comm.size
@@ -50,10 +58,10 @@ def _test_pic_swarm_in_plex(m):
     assert len(localpointcoords) == swarm.getLocalSize()
     # Check there are as many local points as there are local cells
     # (including ghost cells in the halo)
-    assert len(localpointcoords) == m.num_cells() == m.cell_set.total_size
+    assert len(localpointcoords) == parentmesh.num_cells() == parentmesh.cell_set.total_size
     # Check total number of points on all MPI ranks is correct
     # (excluding ghost cells in the halo)
-    nghostcellslocal = m.cell_set.total_size - m.cell_set.size
+    nghostcellslocal = parentmesh.cell_set.total_size - parentmesh.cell_set.size
     nghostcellsglobal = MPI.COMM_WORLD.allreduce(nghostcellslocal, op=MPI.SUM)
     nptslocal = len(localpointcoords)
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
@@ -63,41 +71,33 @@ def _test_pic_swarm_in_plex(m):
     #TODO
     return swarm
 
-# 1D case not implemented yet
-@pytest.mark.xfail
-def test_pic_swarm_in_plex_1d():
-    swarm = _test_pic_swarm_in_plex(UnitIntervalMesh(1))
+@pytest.mark.parallel
+@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_pic_swarm_in_plex_parallel(parentmesh):
+    test_pic_swarm_in_plex(parentmesh)
 
-# Need to test cases with 2 cells across 1, 2 and 3 processors
-def _test_pic_swarm_in_plex_2d():
-    swarm = _test_pic_swarm_in_plex(UnitSquareMesh(1,1))
-
-def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
-    _test_pic_swarm_in_plex_2d()
-
-@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
+@pytest.mark.xfail(reason="ghost cells have swarm PIC in them")
 def test_pic_swarm_in_plex_2d_2procs():
-    _test_pic_swarm_in_plex_2d()
+    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
 
-@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
+@pytest.mark.xfail(reason="ghost cells have swarm PIC in them")
 def test_pic_swarm_in_plex_2d_3procs():
-    _test_pic_swarm_in_plex_2d()
+    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
 
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=2)
-def test_pic_swarm_in_plex_3d():
-    swarm = _test_pic_swarm_in_plex(UnitCubeMesh(1,1,1))
-
-def _test_pic_swarm_remove_ghost_cell_coords(m):
+@pytest.mark.parallel
+@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented at all!")
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_pic_swarm_remove_ghost_cell_coords(parentmesh):
     """Test that _test_pic_swarm_remove_ghost_cell_coords removes
     coordinates from ghost cells correctly."""
-    m.init()
-    pointcoords = cell_midpoints(m)
-    plex = m.topology._plex
+    parentmesh.init()
+    pointcoords = cell_midpoints(parentmesh)
+    plex = parentmesh.topology._plex
     swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
-    mesh._pic_swarm_remove_ghost_cell_coords(m, swarm)
+    mesh._pic_swarm_remove_ghost_cell_coords(parentmesh, swarm)
     # Get point coords on current MPI rank
     localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
     swarm.restoreField("DMSwarmPIC_coor")
@@ -110,25 +110,13 @@ def _test_pic_swarm_remove_ghost_cell_coords(m):
     assert len(localpointcoords) == swarm.getLocalSize()
     # Check there are as many local points as there are local cells
     # (excluding ghost cells in the halo)
-    assert len(localpointcoords) == m.cell_set.size
+    assert len(localpointcoords) == parentmesh.cell_set.size
     # Check total number of points on all MPI ranks is correct
     # (excluding ghost cells in the halo)
     nptslocal = len(localpointcoords)
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
     assert nptsglobal == len(pointcoords)
     assert nptsglobal == swarm.getSize()
-
-@pytest.mark.xfail
-def test_pic_swarm_remove_ghost_cell_coords_1d():
-    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1))
-
-@pytest.mark.xfail
-def test_pic_swarm_remove_ghost_cell_coords_2d():
-    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1))
-
-@pytest.mark.xfail
-def test_pic_swarm_remove_ghost_cell_coords_3d():
-    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1,1))
 
 # Mesh Generation Tests
 
@@ -145,35 +133,17 @@ def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
     # Correct parent topology
     assert vm._parent_mesh is m.topology
 
-def _test_generate(m):
-    vertexcoords = cell_midpoints(m)
-    vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm, vertexcoords, m.geometric_dimension())
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_generate(parentmesh):
+    vertexcoords = cell_midpoints(parentmesh)
+    vm = VertexOnlyMesh(parentmesh, vertexcoords)
+    verify_vertexonly_mesh(parentmesh, vm, vertexcoords, parentmesh.geometric_dimension())
 
-@pytest.mark.xfail
-def test_generate_1d():
-    _test_generate(UnitIntervalMesh(1))
-
-def test_generate_2d():
-    _test_generate(UnitSquareMesh(1,1))
-
-def test_generate_3d():
-    _test_generate(UnitCubeMesh(1,1,1))
-
-@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=2)
-def test_generate_1d_2procs():
-    test_generate_1d()
-
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=2)
-def test_generate_2d_2procs():
-    test_generate_2d()
-
-@pytest.mark.xfail
-@pytest.mark.parallel(nprocs=2)
-def test_generate_3d_2procs():
-    test_generate_3d()
+@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_generate_parallel(parentmesh):
+    test_generate(parentmesh)
 
 # Mesh use tests
 
@@ -216,22 +186,15 @@ def _test_vectorfunctionspace(vm, family, degree):
         # assert f.at(coord) == sum(coord)
         assert np.all(np.isin(2*coord, f.dat.data_ro))
 
-@pytest.mark.parametrize(
-    "parentmesh",
-    [
-        pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(reason="not implemented in 1d")),
-        UnitSquareMesh(1,1),
-        UnitCubeMesh(1,1,1)
-    ],
-)
-@pytest.mark.parametrize(
-    ("family", "degree"),
-    [
-        ("DG", 0),
-        pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
-        pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
-    ],
-)
+"""Families and degrees to test function spaces on VertexOnlyMesh"""
+families_and_degrees = [
+    ("DG", 0),
+    pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
+    pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
+]
+
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+@pytest.mark.parametrize(("family", "degree"), families_and_degrees)
 def test_functionspaces(parentmesh, family, degree):
     vertexcoords = cell_midpoints(parentmesh)
     vm = VertexOnlyMesh(parentmesh, vertexcoords)
@@ -239,23 +202,9 @@ def test_functionspaces(parentmesh, family, degree):
     _test_vectorfunctionspace(vm, family, degree)
 
 @pytest.mark.parallel
-@pytest.mark.xfail(reason="not implemented in parallel")
-@pytest.mark.parametrize(
-    "parentmesh",
-    [
-        pytest.param(UnitIntervalMesh(1), marks=pytest.mark.xfail(reason="not implemented in 1d")),
-        UnitSquareMesh(1,1),
-        UnitCubeMesh(1,1,1)
-    ],
-)
-@pytest.mark.parametrize(
-    ("family", "degree"),
-    [
-        ("DG", 0),
-        pytest.param("DG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported degree")),
-        pytest.param("CG", 1, marks=pytest.mark.xfail(raises=ValueError, reason="unsupported family and degree"))
-    ],
-)
+@pytest.mark.xfail(raises=NotImplementedError, reason="not implemented in parallel")
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+@pytest.mark.parametrize(("family", "degree"), families_and_degrees)
 def test_functionspaces_parallel(parentmesh, family, degree):
     test_functionspaces(parentmesh, family, degree)
 
