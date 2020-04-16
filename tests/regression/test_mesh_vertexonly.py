@@ -59,9 +59,13 @@ def _test_pic_swarm_in_plex(m):
     #TODO
     return swarm
 
-def _test_pic_swarm_remove_ghost_cell_coords(m, swarm):
+def _test_pic_swarm_remove_ghost_cell_coords(m):
     """Test that _test_pic_swarm_remove_ghost_cell_coords removes
     coordinates from ghost cells correctly."""
+    m.init()
+    pointcoords = cell_midpoints(m)
+    plex = m.topology._plex
+    swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
     mesh._pic_swarm_remove_ghost_cell_coords(m, swarm)
     # Get point coords on current MPI rank
     localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
@@ -84,38 +88,49 @@ def _test_pic_swarm_remove_ghost_cell_coords(m, swarm):
     assert nptsglobal == swarm.getSize()
 
 # 1D case not implemented yet
-@pytest.mark.parallel(nprocs=2)
+@pytest.mark.xfail
 def test_pic_swarm_in_plex_1d():
-    with pytest.raises(NotImplementedError):
-        m = UnitIntervalMesh(1)
-        swarm = _test_pic_swarm_in_plex(m)
-        _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
+    swarm = _test_pic_swarm_in_plex(UnitIntervalMesh(1))
 
 # Need to test cases with 2 cells across 1, 2 and 3 processors
 def _test_pic_swarm_in_plex_2d():
-    m = UnitSquareMesh(1,1)
-    swarm = _test_pic_swarm_in_plex(m)
-    _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
+    swarm = _test_pic_swarm_in_plex(UnitSquareMesh(1,1))
 
 def test_pic_swarm_in_plex_2d(): # nprocs < total number of mesh cells
     _test_pic_swarm_in_plex_2d()
 
+@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
 def test_pic_swarm_in_plex_2d_2procs():
     _test_pic_swarm_in_plex_2d()
 
+@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
 def test_pic_swarm_in_plex_2d_3procs():
     _test_pic_swarm_in_plex_2d()
 
+@pytest.mark.xfail
 @pytest.mark.parallel(nprocs=2)
 def test_pic_swarm_in_plex_3d():
-    m = UnitCubeMesh(1,1,1)
-    swarm = _test_pic_swarm_in_plex(m)
-    _test_pic_swarm_remove_ghost_cell_coords(m, swarm)
+    swarm = _test_pic_swarm_in_plex(UnitCubeMesh(1,1,1))
+
+@pytest.mark.xfail
+def test_pic_swarm_remove_ghost_cell_coords_1d():
+    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1))
+
+@pytest.mark.xfail
+def test_pic_swarm_remove_ghost_cell_coords_2d():
+    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1))
+
+@pytest.mark.xfail
+def test_pic_swarm_remove_ghost_cell_coords_3d():
+    _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1,1))
 
 def verify_vertexonly_mesh(m, vm, gdim):
     # test that the mesh properties are as expected
+    assert m.geometric_dimension() == gdim
+    assert vm.geometric_dimension() == gdim
+    assert vm.topological_dimension() == 0
     # Can initialise
     vm.init()
     # Check properties
@@ -140,25 +155,20 @@ def verify_vertexonly_mesh(m, vm, gdim):
     for coord in vm.coordinates.dat.data_ro:
         f.at(coord) == sum(coord)
 
-def test_generate():
-
-    # 1D case not implemented yet
-    with pytest.raises(NotImplementedError):
-        m = UnitIntervalMesh(1)
-        vertexcoords = cell_midpoints(m)
-        vm = VertexOnlyMesh(m, vertexcoords)
-        verify_vertexonly_mesh(m, vm, 1)
-
-    m = UnitSquareMesh(1,1)
+def _test_generate(m):
     vertexcoords = cell_midpoints(m)
     vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm, 2)
+    verify_vertexonly_mesh(m, vm, m.geometric_dimension())
 
+@pytest.mark.xfail
+def test_generate_1d():
+    _test_generate(UnitIntervalMesh(1))
 
-    m = UnitCubeMesh(1,1,1)
-    vertexcoords = cell_midpoints(m)
-    vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm, 3)
+def test_generate_2d():
+    _test_generate(UnitSquareMesh(1,1))
+
+def test_generate_3d():
+    _test_generate(UnitCubeMesh(1,1,1))
 
 # remove this before final merge
 if __name__ == "__main__":
