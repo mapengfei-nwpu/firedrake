@@ -126,15 +126,16 @@ def test_pic_swarm_remove_ghost_cell_coords_2d():
 def test_pic_swarm_remove_ghost_cell_coords_3d():
     _test_pic_swarm_remove_ghost_cell_coords(UnitIntervalMesh(1,1,1))
 
-def verify_vertexonly_mesh(m, vm, gdim):
-    # test that the mesh properties are as expected
+def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
     assert m.geometric_dimension() == gdim
+    # Correct dims
     assert vm.geometric_dimension() == gdim
     assert vm.topological_dimension() == 0
     # Can initialise
     vm.init()
-    # Check properties
-    #TODO
+    # Correct coordinates
+    assert np.shape(vm.coordinates.dat.data_ro) == np.shape(vertexcoords)
+    assert np.all(np.isin(vm.coordinates.dat.data_ro, vertexcoords))
     # Can create function spaces
     V = FunctionSpace(vm, "DG", 0)
     # Can't create function space other than DG0
@@ -152,13 +153,16 @@ def verify_vertexonly_mesh(m, vm, gdim):
         x, y, z = SpatialCoordinate(vm)
         f.interpolate(x+y+z)
     # Get exact values at coordinates
+    assert np.shape(f.dat.data_ro)[0] == np.shape(vm.coordinates.dat.data_ro)[0]
     for coord in vm.coordinates.dat.data_ro:
-        f.at(coord) == sum(coord)
+        # .at doesn't work on immersed manifolds
+        # assert f.at(coord) == sum(coord)
+        assert np.isin(sum(coord), f.dat.data_ro)
 
 def _test_generate(m):
     vertexcoords = cell_midpoints(m)
     vm = VertexOnlyMesh(m, vertexcoords)
-    verify_vertexonly_mesh(m, vm, m.geometric_dimension())
+    verify_vertexonly_mesh(m, vm, vertexcoords, m.geometric_dimension())
 
 @pytest.mark.xfail
 def test_generate_1d():
@@ -172,7 +176,6 @@ def test_generate_3d():
 
 # remove this before final merge
 if __name__ == "__main__":
-    # f = Function(V).interpolate(m.coordinates)
-    test_generate()
+    test_generate_2d()
     import pytest, sys
     pytest.main([sys.argv[0]])
