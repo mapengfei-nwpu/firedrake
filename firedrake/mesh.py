@@ -1844,8 +1844,6 @@ def VertexOnlyMesh(mesh, vertexcoords, comm=COMM_WORLD):
         raise NotImplementedError("Only straight edged meshes are supported")
 
     swarm = _pic_swarm_in_plex(mesh.topology._plex, vertexcoords)
-    if swarm.comm.size > 1:
-        _pic_swarm_remove_ghost_cell_coords(mesh, swarm)
 
     # Topology
     topology = VertexOnlyMeshTopology(swarm, mesh.topology, name="swarmmesh", reorder=False)
@@ -1960,14 +1958,6 @@ def _pic_swarm_in_plex(dmplex, coords, comm=COMM_WORLD):
     # mesh topologies.
 
     return swarm
-
-def _pic_swarm_remove_ghost_cell_coords(parentmesh, dmswarm):
-    """
-    Remove coordinates from a Particle In Cell (PIC) DMSwarm `dmswarm`
-    immersed in `parentmesh` which are located in the ghost cells of
-    `parentmesh`.
-    """
-    raise NotImplementedError("Removal of DMSwarm Coordinates from Ghost cells still WIP")
 
 def SubDomainData(geometric_expr):
     """Creates a subdomain data object from a boolean-valued UFL expression.

@@ -57,58 +57,6 @@ def test_pic_swarm_in_plex(parentmesh):
     # Check methods for checking number of points on current MPI rank
     assert len(localpointcoords) == swarm.getLocalSize()
     # Check there are as many local points as there are local cells
-    # (including ghost cells in the halo)
-    assert len(localpointcoords) == parentmesh.num_cells() == parentmesh.cell_set.total_size
-    # Check total number of points on all MPI ranks is correct
-    # (excluding ghost cells in the halo)
-    nghostcellslocal = parentmesh.cell_set.total_size - parentmesh.cell_set.size
-    nghostcellsglobal = MPI.COMM_WORLD.allreduce(nghostcellslocal, op=MPI.SUM)
-    nptslocal = len(localpointcoords)
-    nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
-    assert nptsglobal-nghostcellsglobal == len(pointcoords)
-    assert nptsglobal == swarm.getSize()
-    # Check each cell has the correct point associated with it
-    #TODO
-    return swarm
-
-@pytest.mark.parallel
-@pytest.mark.xfail(reason="not implemented in parallel")
-@pytest.mark.parametrize("parentmesh", parentmeshes)
-def test_pic_swarm_in_plex_parallel(parentmesh):
-    test_pic_swarm_in_plex(parentmesh)
-
-@pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
-@pytest.mark.xfail(reason="ghost cells have swarm PIC in them")
-def test_pic_swarm_in_plex_2d_2procs():
-    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
-
-@pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
-@pytest.mark.xfail(reason="ghost cells have swarm PIC in them")
-def test_pic_swarm_in_plex_2d_3procs():
-    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
-
-@pytest.mark.parallel
-@pytest.mark.xfail(reason="not implemented at all!")
-@pytest.mark.parametrize("parentmesh", parentmeshes)
-def test_pic_swarm_remove_ghost_cell_coords(parentmesh):
-    """Test that _test_pic_swarm_remove_ghost_cell_coords removes
-    coordinates from ghost cells correctly."""
-    parentmesh.init()
-    pointcoords = cell_midpoints(parentmesh)
-    plex = parentmesh.topology._plex
-    swarm = mesh._pic_swarm_in_plex(plex, pointcoords)
-    mesh._pic_swarm_remove_ghost_cell_coords(parentmesh, swarm)
-    # Get point coords on current MPI rank
-    localpointcoords = np.copy(swarm.getField("DMSwarmPIC_coor"))
-    swarm.restoreField("DMSwarmPIC_coor")
-    if len(pointcoords.shape) > 1:
-        localpointcoords = np.reshape(localpointcoords, (-1, pointcoords.shape[1]))
-    # check local points are found in list of points
-    for p in localpointcoords:
-        assert np.any(np.isclose(p, pointcoords))
-    # Check methods for checking number of points on current MPI rank
-    assert len(localpointcoords) == swarm.getLocalSize()
-    # Check there are as many local points as there are local cells
     # (excluding ghost cells in the halo)
     assert len(localpointcoords) == parentmesh.cell_set.size
     # Check total number of points on all MPI ranks is correct
@@ -117,6 +65,21 @@ def test_pic_swarm_remove_ghost_cell_coords(parentmesh):
     nptsglobal = MPI.COMM_WORLD.allreduce(nptslocal, op=MPI.SUM)
     assert nptsglobal == len(pointcoords)
     assert nptsglobal == swarm.getSize()
+    # Check each cell has the correct point associated with it
+    #TODO
+
+@pytest.mark.parallel
+@pytest.mark.parametrize("parentmesh", parentmeshes)
+def test_pic_swarm_in_plex_parallel(parentmesh):
+    test_pic_swarm_in_plex(parentmesh)
+
+@pytest.mark.parallel(nprocs=2) # nprocs == total number of mesh cells
+def test_pic_swarm_in_plex_2d_2procs():
+    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
+
+@pytest.mark.parallel(nprocs=3) ## nprocs > total number of mesh cells
+def test_pic_swarm_in_plex_2d_3procs():
+    test_pic_swarm_in_plex(UnitSquareMesh(1,1))
 
 # Mesh Generation Tests
 
@@ -132,6 +95,8 @@ def verify_vertexonly_mesh(m, vm, vertexcoords, gdim):
     assert np.all(np.isin(vm.coordinates.dat.data_ro, vertexcoords))
     # Correct parent topology
     assert vm._parent_mesh is m.topology
+    # Check other properties
+    # TODO
 
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 def test_generate(parentmesh):
@@ -140,7 +105,6 @@ def test_generate(parentmesh):
     verify_vertexonly_mesh(parentmesh, vm, vertexcoords, parentmesh.geometric_dimension())
 
 @pytest.mark.parallel(nprocs=2)
-@pytest.mark.xfail(reason="not implemented in parallel")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 def test_generate_parallel(parentmesh):
     test_generate(parentmesh)
@@ -202,7 +166,6 @@ def test_functionspaces(parentmesh, family, degree):
     _test_vectorfunctionspace(vm, family, degree)
 
 @pytest.mark.parallel
-@pytest.mark.xfail(reason="not implemented in parallel")
 @pytest.mark.parametrize("parentmesh", parentmeshes)
 @pytest.mark.parametrize(("family", "degree"), families_and_degrees)
 def test_functionspaces_parallel(parentmesh, family, degree):
