@@ -5,7 +5,7 @@ from collections import OrderedDict
 from ufl.algorithms.multifunction import MultiFunction
 
 from gem import (Literal, Sum, Product, Indexed, ComponentTensor, IndexSum,
-                 FlexiblyIndexed, Solve, Inverse, Variable)
+                 FlexiblyIndexed, Solve, Inverse, Variable, StructuredSparseVariable)
 
 
 from functools import singledispatch, update_wrapper
@@ -205,6 +205,8 @@ class SlateTranslator():
     @slate_to_gem.register(firedrake.slate.slate.Tensor)
     def slate_to_gem_tensor(self, tensor, node_dict):
         idx = self.builder.gem_indices[tensor]
+        print('idx:', idx)
+        print('index tensor', self.index_tensor(self.builder.temps[tensor], idx))
         return ComponentTensor(self.index_tensor(self.builder.temps[tensor], idx), idx)
 
     @slate_to_gem.register(firedrake.slate.slate.AssembledVector)
@@ -330,7 +332,7 @@ class SlateTranslator():
         pull up a scalar variable to a tensor thing with this indices
         - index it with new indices :arg idx.
         """
-        if type(var) == Variable or type(var) == ComponentTensor or type(var) == Inverse or type(var) == Solve:
+        if type(var) == Variable or type(var) == ComponentTensor or type(var) == Inverse or type(var) == Solve or type(var) == StructuredSparseVariable:
             var = Indexed(var, idx)
         else:
             assert True, "Variable type is "+str(type(var))+". Must be a type that has shape."
@@ -538,12 +540,12 @@ def merge_loopy(loopy_outer, loopy_inner_list, builder):
 
     # Generate temp e.g. for plexmesh_exterior_local_facet_number (maps from global to local facets)
     if builder.needs_cell_facets:
-        loopy_outer.temporary_variables["facet_array"] = lp.TemporaryVariable(builder.local_facet_array_arg,
-                                                                              shape=(builder.num_facets, 2),
-                                                                              dtype=np.uint32,
-                                                                              address_space=lp.AddressSpace.LOCAL,
-                                                                              read_only=True,
-                                                                              initializer=np.arange(builder.num_facets, dtype=np.uint32))
+        loopy_outer.temporary_variables["facet_array"] = lp.TemporaryVariable(builder.local_facet_array_arg, 
+            shape=(builder.num_facets, 2),
+            dtype=np.uint32,
+            address_space=lp.AddressSpace.LOCAL,
+            read_only=True,
+            initializer=np.arange(builder.num_facets, dtype=np.uint32))
 
     # Get the CallInstruction for each kernel from builder
     kitting_insn = []

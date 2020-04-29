@@ -31,6 +31,7 @@ from firedrake.parameters import parameters
 from firedrake.utils import ScalarType_c
 from ufl.log import GREEN
 from gem.utils import groupby
+from gem.view_gem_dag import view_gem_dag
 from gem import impero_utils
 
 from itertools import chain
@@ -77,8 +78,8 @@ class SlateKernel(TSFCKernel):
                     + str(sorted(tsfc_parameters.items()))).encode()).hexdigest(), expr.ufl_domains()[0].comm
 
     def __init__(self, expr, tsfc_parameters, coffee=False):
-        if self._initialized:
-            return
+        # if self._initialized:
+            # return
         if coffee:
             self.split_kernel = generate_kernel(expr, tsfc_parameters)
         else:
@@ -131,15 +132,33 @@ def generate_loopy_kernel(slate_expr, tsfc_parameters=None):
 
     print("BUILDER DONE")
 
+    # for b in builder.templated_subkernels:
+    #     print('\npre slate-to-gem templated_subkernel ff: ', b)
     # Stage 1: slate to gem....
     gem_expr = slate_to_gem(builder)
+    
+    # for b in builder.templated_subkernels:
+    #     print('\npost slate_to_gem: templated_subkernel ff: ', b)
+    
+    
+    print('\n TEMPS')
+    for temp_name, temp_gem in builder.temps.items():
+        print(temp_name, temp_gem)
 
     # Stage 2a: gem to loopy...
     loopy_outer = gem_to_loopy(gem_expr, builder)
+    print('\nloopy outer:', loopy_outer)
+
+    # for b in builder.templated_subkernels:
+    #     print('\npost slate_to_gem: templated_subkernel ff: ', b)
 
     # Stage 2b: merge loopys...
     loopy_merged = merge_loopy(loopy_outer, builder.templated_subkernels, builder)  # builder owns the callinstruction
     print("LOOPY KERNEL GLUED")
+    # for b in builder.templated_subkernels:
+    #     print('\ntemplated_subkernel: ', b)
+    # print('builder subekernel:', builder.templated_subkernels)
+    print('\n\nloopy_merged:', loopy_merged)
 
     # Stage 2c: register callables...
     loopy_merged = get_inv_callable(loopy_merged)
@@ -164,6 +183,7 @@ def generate_loopy_kernel(slate_expr, tsfc_parameters=None):
     # Cache the resulting kernel
     idx = tuple([0]*slate_expr.rank)
     logger.info(GREEN % "compile_slate_expression finished in %g seconds.", time.time() - cpu_time)
+    print('\n===end of generate loopy kernel')
     return (SplitKernel(idx, kinfo),)
 
 
@@ -628,7 +648,8 @@ def gem_to_loopy(traversed_gem_expr_dag, builder):
         idx = builder.gem_indices[str(builder.expression)+"out"]
     else:
         idx = traversed_gem_expr_dag[0].multiindex
-    ret_vars = [gem.Indexed(gem.Variable("output", shape), idx)]
+    # ret_vars = [gem.Indexed(gem.Variable("output", shape), idx)]
+    ret_vars = [gem.Indexed(gem.StructuredSparseVariable("output", shape), idx)]
 
     # TODO the global argument generation must be made nicer
     # Maybe this can be done in the builder?
@@ -688,17 +709,15 @@ def gem_to_loopy(traversed_gem_expr_dag, builder):
     if builder.needs_mesh_layers:
         args.append(loopy.TemporaryVariable("layer", shape=(), dtype=np.int32, address_space=loopy.AddressSpace.GLOBAL))
 
-    ############
-    # TODO: preprocessing of gem for removing unneccesary component tensors
-    # print("not peprocessed",traversed_gem_expr_dag)
-    # traversed_gem_expr_dag = impero_utils.preprocess_traversedgem(traversed_gem_expr_dag[0])
-    # print("preprocessed",traversed_gem_expr_dag)
-    # print(traversed_gem_expr_dag[1])
-    # traversed_gem_expr_dag=traversed_gem_expr_dag[1]
+    # Optionally remove ComponentTensors and/or do IndexSum-Delta cancellation
+    print('\ntraversed_gem_dag:', traversed_gem_expr_dag)
+    # view_gem_dag(traversed_gem_expr_dag)
+    traversed_gem_expr_dag = impero_utils.preprocess_gem(traversed_gem_expr_dag)
 
     # glue assignments to return variable
     assignments = list(zip(ret_vars, traversed_gem_expr_dag))
     impero_c = impero_utils.compile_gem(assignments, (), remove_zeros=False)
+    print('\nimpero_c:', impero_c)
 
     # Part B: impero_c to loopy
     precision = 12

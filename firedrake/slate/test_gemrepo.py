@@ -317,77 +317,92 @@ def marybarker_solve_curl_curl(mesh, f, degree, with_tensor=False):
         # does not throw an error if degree > 4 anymore
 
 
+def test_sparse_matrix():
+    mesh = UnitSquareMesh(4, 4)
+    V = VectorFunctionSpace(mesh, "CG", 1)
+    u = TrialFunction(V)
+    v = TestFunction(V)
+    # sigma, u = TrialFunctions(V)
+    # tau, v = TestFunctions(V)
+    a = inner(u,v) * dx
+    print('type a: ', type(a))
+    A = assemble(Tensor(a))
+    # A = assemble(a)
+    # print('\nA:', A) # global matrix - don't care about this
+
+test_sparse_matrix()
+
 """
 Run test script
 """
 print("Run test for slate to loopy compilation.\n\n")
 
-# discontinuous Helmholtz equation on cell integrals
-mesh = UnitSquareMesh(5, 5)
-V = FunctionSpace(mesh, "DG", 1)
-u = TrialFunction(V)
-v = TestFunction(V)
-f = Function(V)
-x, y = SpatialCoordinate(mesh)
-f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
-a = (dot(grad(v), grad(u)) + v * u) * dx
-L = f * v * dx
+# # discontinuous Helmholtz equation on cell integrals
+# mesh = UnitSquareMesh(5, 5)
+# V = FunctionSpace(mesh, "DG", 1)
+# u = TrialFunction(V)
+# v = TestFunction(V)
+# f = Function(V)
+# x, y = SpatialCoordinate(mesh)
+# f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
+# a = (dot(grad(v), grad(u)) + v * u) * dx
+# L = f * v * dx
 
-test_negative(a)
-test_stacked(a, L)
-test_assemble_matrix(a)
-test_negative(a)
-test_add(a)
-test_assembled_vector(L)
-test_transpose(a)
-test_mul_dx(a, L, V, mesh)
-test_solve(a, L, V)
-test_solve_local(a, L)
-test_inverse_local(a)
-test_transpose(a)
+# test_negative(a)
+# test_stacked(a, L)
+# test_assemble_matrix(a)
+# test_negative(a)
+# test_add(a)
+# test_assembled_vector(L)
+# test_transpose(a)
+# test_mul_dx(a, L, V, mesh)
+# test_solve(a, L, V)
+# test_solve_local(a, L)
+# test_inverse_local(a)
+# test_transpose(a)
 
-# discontinuous Helmholtz equation on facet integrals
-mesh = UnitSquareMesh(5, 5)
-V = FunctionSpace(mesh, "DG", 1)
-u = TrialFunction(V)
-v = TestFunction(V)
-f = Function(V)
-x, y = SpatialCoordinate(mesh)
-f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
-a = (v * u) * ds
-L = f * v * ds
+# # discontinuous Helmholtz equation on facet integrals
+# mesh = UnitSquareMesh(5, 5)
+# V = FunctionSpace(mesh, "DG", 1)
+# u = TrialFunction(V)
+# v = TestFunction(V)
+# f = Function(V)
+# x, y = SpatialCoordinate(mesh)
+# f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
+# a = (v * u) * ds
+# L = f * v * ds
 
-test_assemble_matrix(a)
-test_negative(a)
-test_add(a)
-test_mul_ds(a, L, V, mesh)
-test_inverse_local(a)
+# test_assemble_matrix(a)
+# test_negative(a)
+# test_add(a)
+# test_mul_ds(a, L, V, mesh)
+# test_inverse_local(a)
 
-# continuous Helmholtz equation on facet integrals (works also on cell)
-mesh = UnitSquareMesh(5, 5)
-V = FunctionSpace(mesh, "CG", 1)
-u = TrialFunction(V)
-v = TestFunction(V)
-f = Function(V)
-x, y = SpatialCoordinate(mesh)
-f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
-a = (dot(grad(v), grad(u)) + u * v) * ds
-L = f * v * ds
+# # continuous Helmholtz equation on facet integrals (works also on cell)
+# mesh = UnitSquareMesh(5, 5)
+# V = FunctionSpace(mesh, "CG", 1)
+# u = TrialFunction(V)
+# v = TestFunction(V)
+# f = Function(V)
+# x, y = SpatialCoordinate(mesh)
+# f.interpolate((1+8*pi*pi)*cos(x*pi*2)*cos(y*pi*2))
+# a = (dot(grad(v), grad(u)) + u * v) * ds
+# L = f * v * ds
 
-test_assemble_matrix(a)
-test_negative(a)
-test_add(a)
-test_inverse_local(a)
+# test_assemble_matrix(a)
+# test_negative(a)
+# test_add(a)
+# test_inverse_local(a)
 
-# test for assembly of blocks of mixed systems
-# (here for lowest order RT-DG discretisation)
-test_blocks()
+# # test for assembly of blocks of mixed systems
+# # (here for lowest order RT-DG discretisation)
+# test_blocks()
 
-# test of block assembly of mixed system defined on extruded mesh
-test_layers()
+# # test of block assembly of mixed system defined on extruded mesh
+# test_layers()
 
-# issue raised by marybarker
-mesh = UnitTetrahedronMesh()
-marybarker_solve_curl_curl(mesh, Constant((1, 1, 1)), 5, True)
+# # issue raised by marybarker
+# mesh = UnitTetrahedronMesh()
+# marybarker_solve_curl_curl(mesh, Constant((1, 1, 1)), 5, True)
 
 print("\n\nAll tests passed.")

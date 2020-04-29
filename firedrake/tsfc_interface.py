@@ -223,6 +223,7 @@ def compile_form(form, name, parameters=None, inverse=False, split=True, interfa
                             number_map, interface, coffee, diagonal).kernels
         for kinfo in kinfos:
             kernels.append(SplitKernel(idx, kinfo))
+            print('\nSplitKernel(idx, kinfo):', SplitKernel(idx, kinfo))
     kernels = tuple(kernels)
     return cache.setdefault(key, kernels)
 
