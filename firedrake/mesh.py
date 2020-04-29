@@ -426,8 +426,6 @@ class MeshTopology(object):
             plex.distribute(overlap=0)
 
         tdim = plex.getDimension()
-        # assume the embedding space is the same as the geometric space
-        gdim = plex.getCoordinateDim()
 
         # Allow empty local meshes on a process
         cStart, cEnd = plex.getHeightStratum(0)  # cells
