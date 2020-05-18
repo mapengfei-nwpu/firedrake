@@ -290,7 +290,6 @@ def vectorfunctionspace_tests(vm, family, degree):
     assert np.isclose(assemble(inner(f, f)*dx), num_cells_mpi_global*gdim)
 
 
-
 """Families and degrees to test function spaces on VertexOnlyMesh"""
 families_and_degrees = [
     ("DG", 0),
